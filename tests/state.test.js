@@ -1,17 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { seq, pileOf } from "./pile-helper.js";
 import {
   ADVANCE_DELAY_MS, createState, startGame, nextRound,
   addToPile, removeFromPile, clearPile, submitCheck, canAdvance,
   setDifficulty,
 } from "../src/state.js";
 
-const EXACT_395 = { "£2": 1, "£1": 1, "50p": 1, "20p": 2, "5p": 1 };
+const EXACT_395 = pileOf("£2", "£1", "50p", "20p", "20p", "5p");
 const withPile = (s, pile) => ({ ...s, pile });
 
 test("createState has the expected shape", () => {
   assert.deepEqual(createState(), {
-    mode: "endless", target: 0, pile: {}, rounds: 0, solved: false, solvedAt: 0,
+    mode: "endless", target: 0, pile: [], nextUid: 1, rounds: 0, solved: false, solvedAt: 0,
     message: { text: "", kind: "" },
     difficulty: "normal",
   });
@@ -22,7 +23,7 @@ test("startGame sets mode and target with an empty pile and rounds 0", () => {
   const s = startGame(createState(), "endless", 395);
   assert.equal(s.mode, "endless");
   assert.equal(s.target, 395);
-  assert.deepEqual(s.pile, {});
+  assert.deepEqual(s.pile, []);
   assert.equal(s.rounds, 0);
 });
 
@@ -38,18 +39,67 @@ test("startGame resets rounds but nextRound keeps them", () => {
 test("nextRound clears pile, solved flag and message", () => {
   let s = submitCheck(withPile(startGame(createState(), "custom", 395), EXACT_395), 1000);
   s = nextRound(s, 395);
-  assert.deepEqual(s.pile, {});
+  assert.deepEqual(s.pile, []);
   assert.equal(s.solved, false);
   assert.deepEqual(s.message, { text: "", kind: "" });
 });
 
-test("addToPile and removeFromPile round-trip without mutating input", () => {
+test("addToPile appends an entry with the next uid and placement from rng", () => {
   const s0 = startGame(createState(), "custom", 395);
-  const s1 = addToPile(s0, "5p");
-  assert.deepEqual(s1.pile, { "5p": 1 });
-  assert.deepEqual(s0.pile, {});
-  assert.deepEqual(removeFromPile(s1, "5p").pile, {});
-  assert.deepEqual(removeFromPile(s0, "5p").pile, {});
+  const s1 = addToPile(s0, "5p", seq([0.5, 0.5, 0.25]));
+  assert.deepEqual(s1.pile, [{ uid: 1, coinId: "5p", x: 0, y: 0, rot: 90 }]);
+  assert.equal(s1.nextUid, 2);
+  assert.deepEqual(s0.pile, []);
+  assert.equal(s0.nextUid, 1);
+});
+
+test("uids are never reused after a removal", () => {
+  const s1 = addToPile(startGame(createState(), "custom", 395), "5p");
+  const s2 = removeFromPile(s1, 1);
+  assert.deepEqual(s2.pile, []);
+  assert.equal(addToPile(s2, "5p").pile[0].uid, 2);
+});
+
+test("addToPile keeps earlier entries untouched", () => {
+  const s1 = addToPile(startGame(createState(), "custom", 395), "5p");
+  const first = { ...s1.pile[0] };
+  const s2 = addToPile(s1, "£1");
+  assert.equal(s2.pile.length, 2);
+  assert.deepEqual(s2.pile[0], first);
+  assert.equal(s2.pile[1].uid, 2);
+});
+
+test("addToPile ignores an unknown coin id", () => {
+  const s = startGame(createState(), "custom", 395);
+  assert.equal(addToPile(s, "3p"), s);
+});
+
+test("removeFromPile removes only the matching uid", () => {
+  let s = startGame(createState(), "custom", 395);
+  s = addToPile(addToPile(addToPile(s, "5p"), "5p"), "£1");
+  const r = removeFromPile(s, 2);
+  assert.deepEqual(r.pile.map((e) => e.uid), [1, 3]);
+  assert.equal(r.nextUid, 4);
+});
+
+test("removeFromPile with an unknown uid returns the same object", () => {
+  const s = addToPile(startGame(createState(), "custom", 395), "5p");
+  assert.equal(removeFromPile(s, 99), s);
+});
+
+test("clearPile empties the pile and keeps nextUid", () => {
+  const s = addToPile(addToPile(startGame(createState(), "custom", 395), "5p"), "£1");
+  const c = clearPile(s);
+  assert.deepEqual(c.pile, []);
+  assert.equal(c.nextUid, 3);
+});
+
+test("startGame and nextRound reset the pile and nextUid", () => {
+  const s = addToPile(startGame(createState(), "endless", 395), "5p");
+  for (const r of [startGame(s, "custom", 100), nextRound(s, 100)]) {
+    assert.deepEqual(r.pile, []);
+    assert.equal(r.nextUid, 1);
+  }
 });
 
 test("submitCheck reports exact, over and under for target 395", () => {
@@ -58,7 +108,7 @@ test("submitCheck reports exact, over and under for target 395", () => {
   assert.equal(exact.solved, true);
   assert.equal(exact.solvedAt, 1000);
   assert.deepEqual(exact.message, { text: "Correct! You made exactly £3.95.", kind: "success" });
-  const over = submitCheck(withPile(s, { "£2": 2 }), 1000);
+  const over = submitCheck(withPile(s, pileOf("£2", "£2")), 1000);
   assert.equal(over.solved, false);
   assert.deepEqual(over.message, { text: "A bit too much", kind: "hint" });
   const under = submitCheck(s, 1000);
@@ -75,7 +125,7 @@ test("endless exact increments rounds; custom exact does not", () => {
 test("a solved round cannot be changed or re-submitted", () => {
   const solved = submitCheck(withPile(startGame(createState(), "endless", 395), EXACT_395), 1000);
   assert.equal(addToPile(solved, "1p"), solved);
-  assert.equal(removeFromPile(solved, "£2"), solved);
+  assert.equal(removeFromPile(solved, 1), solved);
   assert.equal(clearPile(solved), solved);
   assert.equal(submitCheck(solved, 5000), solved);
   assert.equal(solved.rounds, 1);
@@ -98,7 +148,7 @@ test("canAdvance needs a solved round and 400ms", () => {
 });
 
 test("setDifficulty switches between easy and normal without touching the round", () => {
-  const s = withPile(startGame(createState(), "endless", 395), { "£1": 1 });
+  const s = withPile(startGame(createState(), "endless", 395), pileOf("£1"));
   const easy = setDifficulty(s, "easy");
   assert.equal(easy.difficulty, "easy");
   assert.deepEqual(easy.pile, s.pile);

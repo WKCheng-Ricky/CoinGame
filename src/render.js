@@ -1,4 +1,5 @@
 import { COINS } from "./coins.js";
+import { PILE_HEIGHT_MM, PILE_MARGIN_MM, PILE_WIDTH_MM, pileBox } from "./game.js";
 
 const SIDES = { heptagon: 7, dodecagon: 12 };
 const STROKE = "#00000055";
@@ -41,16 +42,29 @@ export function renderTray(container) {
 }
 
 export function renderPile(container, pile) {
-  container.replaceChildren(
-    ...COINS.filter((coin) => pile[coin.id]).map((coin) =>
-      coinButton(
-        coin,
-        "stack",
-        `Remove one ${coin.label} (${pile[coin.id]} in pile)`,
-        `<span class="badge">×${pile[coin.id]}</span>`,
-      ),
-    ),
-  );
+  container.style.setProperty("--pile-w-mm", PILE_WIDTH_MM + 2 * PILE_MARGIN_MM);
+  container.style.setProperty("--pile-h-mm", PILE_HEIGHT_MM + 2 * PILE_MARGIN_MM);
+  const existing = new Map([...container.children].map((el) => [el.dataset.uid, el]));
+  const live = new Set(pile.map((e) => String(e.uid)));
+  for (const [uid, el] of existing) {
+    if (!live.has(uid)) { el.remove(); existing.delete(uid); }
+  }
+  const ordered = pile.map((entry) => {
+    const key = String(entry.uid);
+    let btn = existing.get(key);
+    if (!btn) {
+      const coin = COINS.find((c) => c.id === entry.coinId);
+      btn = coinButton(coin, "pile-coin settle", `Remove ${coin.label}`);
+      const { left, top } = pileBox(entry);
+      btn.dataset.uid = key;
+      btn.style.left = `${left}%`;
+      btn.style.top = `${top}%`;
+      btn.style.setProperty("--rot", `${entry.rot}deg`);
+      container.append(btn);
+    }
+    return btn;
+  });
+  if (ordered.some((el, i) => container.children[i] !== el)) container.replaceChildren(...ordered);
 }
 
 export function setText(el, text) {

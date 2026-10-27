@@ -1,4 +1,5 @@
-import { addCoin, check, formatPence, removeCoin } from "./game.js";
+import { COINS } from "./coins.js";
+import { check, formatPence, placeCoin } from "./game.js";
 
 export const ADVANCE_DELAY_MS = 400;
 
@@ -6,7 +7,7 @@ const NO_MESSAGE = { text: "", kind: "" };
 
 export function createState() {
   return {
-    mode: "endless", target: 0, pile: {}, rounds: 0, solved: false, solvedAt: 0,
+    mode: "endless", target: 0, pile: [], nextUid: 1, rounds: 0, solved: false, solvedAt: 0,
     message: NO_MESSAGE, difficulty: "normal",
   };
 }
@@ -24,14 +25,22 @@ export function nextRound(state, target) {
   return { ...createState(), mode: state.mode, rounds: state.rounds, target, difficulty: state.difficulty };
 }
 
-function changePile(state, update) {
-  if (state.solved) return state;
-  return { ...state, pile: update(state.pile), message: NO_MESSAGE };
+export function addToPile(state, coinId, rng = Math.random) {
+  const coin = COINS.find((c) => c.id === coinId);
+  if (state.solved || !coin) return state;
+  const entry = { uid: state.nextUid, coinId, ...placeCoin(state.pile, coin, rng) };
+  return { ...state, pile: [...state.pile, entry], nextUid: state.nextUid + 1, message: NO_MESSAGE };
 }
 
-export const addToPile = (state, id) => changePile(state, (pile) => addCoin(pile, id));
-export const removeFromPile = (state, id) => changePile(state, (pile) => removeCoin(pile, id));
-export const clearPile = (state) => changePile(state, () => ({}));
+export function removeFromPile(state, uid) {
+  if (state.solved || !state.pile.some((e) => e.uid === uid)) return state;
+  return { ...state, pile: state.pile.filter((e) => e.uid !== uid), message: NO_MESSAGE };
+}
+
+export function clearPile(state) {
+  if (state.solved) return state;
+  return { ...state, pile: [], message: NO_MESSAGE };
+}
 
 export function submitCheck(state, now) {
   if (state.solved) return state;
