@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Coin Game</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main>
+    <section id="screen-home">
+      <h1 tabindex="-1">Coin Game</h1>
+      <p>Make the amount using UK coins.</p>
+      <div class="stack-col">
+        <button id="btn-endless" class="primary">Endless</button>
+        <button id="btn-custom">Custom</button>
+      </div>
+    </section>
+
+    <section id="screen-custom" hidden>
+      <h1 tabindex="-1">Custom amount</h1>
+      <form id="custom-form" novalidate>
+        <label for="custom-input">Amount to make (£)</label>
+        <input id="custom-input" type="text" aria-describedby="custom-error" inputmode="decimal" autocomplete="off" placeholder="3.95">
+        <p id="custom-error" class="error" role="alert"></p>
+        <div class="row">
+          <button type="submit" class="primary">Start</button>
+          <button type="button" id="custom-back">Back</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="screen-play" hidden>
+      <h1 id="play-heading" class="target" tabindex="-1"><span class="label">Make</span> <span id="play-target"></span></h1>
+      <p id="play-rounds" class="rounds" hidden></p>
+      <div class="board">
+        <div class="pile-area">
+          <h2>Your coins</h2>
+          <div id="play-pile" class="pile"></div>
+          <p id="play-total" class="total" aria-live="polite"></p>
+        </div>
+        <div class="tray-area">
+          <h2>Add a coin</h2>
+          <div id="play-tray" class="tray"></div>
+        </div>
+      </div>
+      <p id="play-message" class="message" aria-live="polite"></p>
+      <div class="row actions">
+        <button id="btn-check" class="primary">Check</button>
+        <button id="btn-clear">Clear</button>
+        <button id="btn-next" class="primary" hidden>Next</button>
+        <button id="btn-again" class="primary" hidden>Play again</button>
+        <button id="btn-change" hidden>Change amount</button>
+        <button id="btn-back">Back</button>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
