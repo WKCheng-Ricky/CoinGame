@@ -6,7 +6,10 @@ import {
   parseAmount, randomTarget, MAX_CUSTOM_PENCE, MAX_RANDOM_PENCE,
 } from "../src/game.js";
 import {
-  placeCoin, pileBox, PILE_WIDTH_MM, PILE_HEIGHT_MM, PILE_MARGIN_MM, CLUSTER_TRIES, MAX_PLACEMENT_TRIES,
+  placeCoin, pileBox, clampPosition, PILE_WIDTH_MM, PILE_HEIGHT_MM, PILE_MARGIN_MM, CLUSTER_TRIES, MAX_PLACEMENT_TRIES,
+} from "../src/game.js";
+import {
+  settlePile, settleGroup, unitUids, STACK_STEP_MM, STACK_LINK_MM, PUSH_FACTOR, MAX_SETTLE_PASSES, stackCounts, DETACH_NUDGE_MM, detachNudge,
 } from "../src/game.js";
 import { seeded, seq, pileOf } from "./pile-helper.js";
 
@@ -191,4 +194,357 @@ test("pileBox maps the centre area into the visible box", () => {
   const hi = pileBox({ x: 0.5, y: 0.5 });
   approx(hi.left, 100 - 10.2601, 1e-4);
   approx(hi.top, 100 - 11.9932, 1e-4);
+});
+
+test("clampPosition returns in-range positions unchanged", () => {
+  assert.deepEqual(clampPosition(0.2, -0.3), { x: 0.2, y: -0.3 });
+  assert.deepEqual(clampPosition(0.5, -0.5), { x: 0.5, y: -0.5 });
+});
+
+test("clampPosition clamps each axis independently to ±0.5", () => {
+  assert.deepEqual(clampPosition(0.9, 0.1), { x: 0.5, y: 0.1 });
+  assert.deepEqual(clampPosition(-2, -0.7), { x: -0.5, y: -0.5 });
+});
+
+test("clampPosition maps NaN to 0 and infinities to the limits", () => {
+  assert.deepEqual(clampPosition(NaN, Infinity), { x: 0, y: 0.5 });
+  assert.deepEqual(clampPosition(-Infinity, NaN), { x: -0.5, y: 0 });
+});
+
+const STEP_X = STACK_STEP_MM.x / PILE_WIDTH_MM;
+const STEP_Y = STACK_STEP_MM.y / PILE_HEIGHT_MM;
+const at = (uid, coinId, x, y, rot = 0) => ({ uid, coinId, x, y, rot });
+const dist = (a, b) => Math.hypot((a.x - b.x) * PILE_WIDTH_MM, (a.y - b.y) * PILE_HEIGHT_MM);
+const rad = (e) => coinById(e.coinId).diameter / 2;
+
+test("settle constants", () => {
+  assert.deepEqual(STACK_STEP_MM, { x: 1, y: -1 });
+  assert.equal(STACK_LINK_MM, 3);
+  assert.equal(PUSH_FACTOR, 0.75);
+  assert.equal(MAX_SETTLE_PASSES, 8);
+});
+
+test("settlePile snaps a same-type coin onto the other", () => {
+  const pile = [at(1, "20p", 0, 0, 40), at(2, "20p", 0.05, 0, 100)];
+  const out = settlePile(pile, 2, null);
+  assert.deepEqual(out[0], pile[0]);
+  assert.ok(Math.abs(out[1].x - STEP_X) < 1e-9);
+  assert.ok(Math.abs(out[1].y - STEP_Y) < 1e-9);
+  assert.equal(out[1].rot, 40);
+  assert.equal(pile[1].x, 0.05);
+});
+
+test("settlePile joins the latest too-close same-type coin", () => {
+  const pile = [at(1, "20p", 0, 0, 40), at(2, "20p", STEP_X, STEP_Y, 40), at(3, "20p", 0.02, 0, 5)];
+  const out = settlePile(pile, 3, null);
+  assert.ok(Math.abs(out[2].x - 2 * STEP_X) < 1e-9);
+  assert.ok(Math.abs(out[2].y - 2 * STEP_Y) < 1e-9);
+  assert.equal(out[2].rot, 40);
+});
+
+test("settlePile returns the same array when nothing is too close", () => {
+  const pile = [at(1, "20p", 0, 0), at(2, "20p", 0.2, 0)];
+  assert.equal(settlePile(pile, 2, null), pile);
+});
+
+test("settlePile pushes different types apart equally along x", () => {
+  const pile = [at(1, "20p", 0, 0), at(2, "50p", 0.05, 0)];
+  const out = settlePile(pile, 2, null);
+  assert.ok(Math.abs(dist(out[0], out[1]) - PUSH_FACTOR * (10.7 + 13.65)) < 1e-6);
+  assert.ok(out[1].x > 0.05);
+  assert.ok(out[0].x < 0);
+  assert.ok(Math.abs((out[1].x - 0.05) + out[0].x) < 1e-9);
+  assert.equal(out[0].y, 0);
+  assert.equal(out[1].y, 0);
+});
+
+test("settlePile separates coincident different coins without NaN", () => {
+  const pile = [at(1, "20p", 0, 0), at(2, "50p", 0, 0)];
+  const out = settlePile(pile, 2, null);
+  assert.ok(Math.abs(dist(out[0], out[1]) - PUSH_FACTOR * (10.7 + 13.65)) < 1e-6);
+  assert.ok(out[1].x > out[0].x);
+  for (const e of out) assert.ok(Number.isFinite(e.x) && Number.isFinite(e.y));
+});
+
+test("settlePile moves a pushed stack as a unit", () => {
+  const pile = [at(1, "20p", 0, 0), at(2, "20p", STEP_X, STEP_Y), at(3, "50p", 0.04, 0)];
+  const out = settlePile(pile, 3, null);
+  const d1 = { x: out[0].x - 0, y: out[0].y - 0 };
+  const d2 = { x: out[1].x - STEP_X, y: out[1].y - STEP_Y };
+  assert.ok(Math.abs(d1.x - d2.x) < 1e-9 && Math.abs(d1.y - d2.y) < 1e-9);
+  assert.ok(d1.x < 0);
+  assert.ok(Math.abs(dist(out[0], out[1]) - Math.hypot(STACK_STEP_MM.x, STACK_STEP_MM.y)) < 1e-9);
+});
+
+test("settlePile cascades pushes to a third coin", () => {
+  const pile = [at(1, "1p", -0.2, 0), at(2, "20p", 0, 0), at(3, "50p", 0.05, 0)];
+  const out = settlePile(pile, 3, null);
+  for (let i = 0; i < out.length; i++) {
+    for (let j = i + 1; j < out.length; j++) {
+      if (out[i].coinId === out[j].coinId) continue;
+      assert.ok(dist(out[i], out[j]) >= Math.min(rad(out[i]), rad(out[j])), `${i}-${j}`);
+    }
+  }
+  const line = [at(1, "1p", -0.09, 0), at(2, "20p", 0, 0), at(3, "50p", 0.05, 0)];
+  const res = settlePile(line, 3, null);
+  assert.notEqual(res[0].x, line[0].x);
+  for (let i = 0; i < 3; i++) {
+    for (let j = i + 1; j < 3; j++) {
+      assert.ok(dist(res[i], res[j]) >= Math.min(rad(res[i]), rad(res[j])), `${i}-${j}`);
+    }
+  }
+});
+
+test("settlePile caps passes on a crowded pile", () => {
+  const ids = ["1p", "2p", "5p", "10p", "20p", "50p", "£1", "£2"];
+  const pile = Array.from({ length: 20 }, (_, i) => at(i + 1, ids[i % ids.length], 0, 0));
+  const out = settlePile(pile, 20, null);
+  assert.deepEqual(out.map((e) => e.uid), pile.map((e) => e.uid));
+  for (const e of out) assert.ok(Math.abs(e.x) <= 0.5 && Math.abs(e.y) <= 0.5);
+});
+
+test("settlePile does not react to moving away", () => {
+  const pile = [at(1, "20p", 0, 0), at(2, "20p", 0.04, 0)];
+  assert.equal(settlePile(pile, 2, { x: 0.01, y: 0 }), pile);
+  const out = settlePile(pile, 2, { x: 0.2, y: 0 });
+  assert.notEqual(out, pile);
+  assert.ok(Math.abs(out[1].x - STEP_X) < 1e-9);
+});
+
+const ARROW_STEP = 0.02;
+const ARROW_DIRS = { Left: [-1, 0], Right: [1, 0], Up: [0, -1], Down: [0, 1] };
+
+function stackOf(n) {
+  return Array.from({ length: n }, (_, i) => at(i + 1, "20p", i * STEP_X, i * STEP_Y, 40));
+}
+
+for (const n of [2, 3]) {
+  for (const [name, [dx, dy]] of Object.entries(ARROW_DIRS)) {
+    test(`settlePile lets an arrow step ${name} pull the top of a ${n}-stack out`, () => {
+      const stack = stackOf(n);
+      const top = stack[n - 1];
+      const from = { x: top.x, y: top.y };
+      const pile = stack.map((e) => (e === top ? { ...e, x: e.x + dx * ARROW_STEP, y: e.y + dy * ARROW_STEP } : e));
+      assert.equal(settlePile(pile, top.uid, from), pile);
+    });
+  }
+}
+
+test("settlePile still snaps a coin dropped from far away onto a stack", () => {
+  const pile = [...stackOf(3), at(4, "20p", 0.02, 0, 5)];
+  const out = settlePile(pile, 4, { x: 0.3, y: 0.3 });
+  assert.notEqual(out, pile);
+  assert.ok(dist(out[3], out[2]) < 3);
+  assert.equal(out[3].rot, 40);
+});
+
+test("settlePile pushes only when a different coin was approached, not moved away from", () => {
+  const pile = [at(1, "20p", 0, 0), at(2, "50p", 0.04, 0)];
+  assert.equal(settlePile(pile, 2, { x: 0.03, y: 0 }), pile);
+  const out = settlePile(pile, 2, { x: 0.3, y: 0 });
+  assert.notEqual(out, pile);
+  assert.ok(dist(out[0], out[1]) > dist(pile[0], pile[1]));
+});
+
+test("settlePile keeps results inside the pile area", () => {
+  const edge = [at(1, "20p", 0.5, 0.5), at(2, "20p", 0.49, 0.5)];
+  for (const e of settlePile(edge, 2, null)) assert.ok(Math.abs(e.x) <= 0.5 && Math.abs(e.y) <= 0.5);
+  const push = [at(1, "20p", 0.5, -0.5), at(2, "50p", 0.49, -0.5)];
+  for (const e of settlePile(push, 2, null)) assert.ok(Math.abs(e.x) <= 0.5 && Math.abs(e.y) <= 0.5);
+});
+
+test("settlePile returns the same array for an unknown uid", () => {
+  const pile = [at(1, "20p", 0, 0)];
+  assert.equal(settlePile(pile, 9, null), pile);
+});
+
+test("settlePile preserves uids, coinIds and order", () => {
+  const pile = [at(1, "20p", 0, 0), at(2, "50p", 0.03, 0), at(3, "20p", 0.01, 0)];
+  const out = settlePile(pile, 3, null);
+  assert.equal(out.length, 3);
+  assert.deepEqual(out.map((e) => [e.uid, e.coinId]), pile.map((e) => [e.uid, e.coinId]));
+  assert.equal(total(out), total(pile));
+});
+
+const SX = STACK_STEP_MM.x / PILE_WIDTH_MM;
+const SY = STACK_STEP_MM.y / PILE_HEIGHT_MM;
+const coinAt = (uid, coinId, x, y) => ({ uid, coinId, x, y, rot: 0 });
+
+test("stackCounts is empty for an empty pile and for far-apart singles", () => {
+  assert.equal(stackCounts([]).size, 0);
+  const far = [coinAt(1, "20p", -0.4, -0.4), coinAt(2, "20p", 0, 0), coinAt(3, "20p", 0.4, 0.4)];
+  assert.equal(stackCounts(far).size, 0);
+});
+
+test("stackCounts maps the last member of a two-coin stack to 2", () => {
+  const m = stackCounts([coinAt(1, "20p", 0, 0), coinAt(2, "20p", SX, SY)]);
+  assert.deepEqual([...m], [[2, 2]]);
+});
+
+test("stackCounts counts a chained stack of three once", () => {
+  const m = stackCounts([coinAt(1, "20p", 0, 0), coinAt(2, "20p", SX, SY), coinAt(3, "20p", 2 * SX, 2 * SY)]);
+  assert.deepEqual([...m], [[3, 3]]);
+});
+
+test("stackCounts follows draw order", () => {
+  const m = stackCounts([coinAt(2, "20p", SX, SY), coinAt(1, "20p", 0, 0)]);
+  assert.deepEqual([...m], [[1, 2]]);
+});
+
+test("stackCounts reports separate stacks separately", () => {
+  const m = stackCounts([
+    coinAt(1, "20p", -0.3, -0.3), coinAt(2, "20p", -0.3 + SX, -0.3 + SY),
+    coinAt(3, "20p", 0.3, 0.3), coinAt(4, "20p", 0.3 + SX, 0.3 + SY),
+  ]);
+  assert.deepEqual([...m].sort(), [[2, 2], [4, 2]]);
+});
+
+test("stackCounts never counts different denominations together", () => {
+  assert.equal(stackCounts([coinAt(1, "20p", 0, 0), coinAt(2, "50p", 0, 0)]).size, 0);
+});
+
+test("stackCounts ignores a different coin between layers in the array", () => {
+  const m = stackCounts([coinAt(1, "20p", 0, 0), coinAt(2, "50p", 0.4, 0.4), coinAt(3, "20p", SX, SY)]);
+  assert.deepEqual([...m], [[3, 2]]);
+});
+
+// ---- group logic ----
+const stackAt = (uids, coinId, x, y, rot = 0) =>
+  uids.map((uid, i) => at(uid, coinId, x + i * STEP_X, y + i * STEP_Y, rot));
+
+test("unitUids returns the stack in draw order, [uid] for a lone coin, [] for unknown", () => {
+  const pile = [...stackAt([1, 2, 3], "20p", 0, 0), at(7, "20p", 0.3, 0.3)];
+  for (const uid of [1, 2, 3]) assert.deepEqual(unitUids(pile, uid), [1, 2, 3]);
+  assert.deepEqual(unitUids(pile, 7), [7]);
+  assert.deepEqual(unitUids(pile, 99), []);
+  assert.deepEqual(unitUids([...pile].reverse(), 2), [3, 2, 1]);
+});
+
+test("the widened link distance keeps a stack linked with a layer removed", () => {
+  const pile = stackAt([1, 2, 3], "20p", 0, 0);
+  const gap = pile.filter((e) => e.uid !== 2);
+  assert.ok(dist(gap[0], gap[1]) > 2.8 && dist(gap[0], gap[1]) < 2.9);
+  assert.deepEqual(unitUids(gap, 1), [1, 3]);
+  assert.equal(stackCounts(gap).get(3), 2);
+  const four = stackAt([1, 2, 3, 4], "20p", 0, 0).filter((e) => e.uid !== 2);
+  assert.equal(stackCounts(four).get(4), 3);
+});
+
+test("settleGroup re-lays a stack above a lone same-type coin", () => {
+  const pile = [at(9, "20p", 0, 0, 77), ...stackAt([1, 2], "20p", 0.2, 0.2, 5)];
+  const from = { x: 0.3, y: 0.3 };
+  const group = pile.slice(1).map((e) => ({ ...e, x: e.x - 0.2, y: e.y - 0.2 }));
+  const start = [pile[0], ...group];
+  const out = settleGroup(start, [1, 2], 1, from);
+  assert.deepEqual(out.map((e) => e.uid), [9, 1, 2]);
+  assert.deepEqual(out.map((e) => e.coinId), ["20p", "20p", "20p"]);
+  assert.deepEqual(out[0], pile[0]);
+  for (const i of [1, 2]) {
+    approx(out[i].x, i * STEP_X);
+    approx(out[i].y, i * STEP_Y);
+    assert.equal(out[i].rot, 77);
+  }
+  assert.equal(stackCounts(out).get(2), 3);
+});
+
+test("settleGroup lands above the top of an existing stack", () => {
+  const base = stackAt([5, 6, 7], "20p", 0, 0, 40);
+  const grp = stackAt([1, 2], "20p", 0.0, 0.0, 0).map((e) => ({ ...e, x: e.x + STEP_X * 0.3 }));
+  const out = settleGroup([...base, ...grp], [1, 2], 1, { x: 0.4, y: 0.4 });
+  const top = base[2];
+  approx(out[3].x, top.x + STEP_X);
+  approx(out[3].y, top.y + STEP_Y);
+  approx(out[4].x, top.x + 2 * STEP_X);
+  approx(out[4].y, top.y + 2 * STEP_Y);
+  assert.equal(stackCounts(out).get(2), 5);
+  const keys = new Set(out.map((e) => `${e.x.toFixed(9)},${e.y.toFixed(9)}`));
+  assert.equal(keys.size, 5);
+});
+
+test("settleGroup pushes a different denomination away and keeps the group rigid", () => {
+  const g1 = at(1, "20p", 0.01, 0.01);
+  const g2 = at(2, "20p", 0.01 + STEP_X, 0.01 + STEP_Y);
+  const far = at(4, "£2", 0.45, -0.45);
+  const pile = [at(3, "50p", 0, 0), g1, g2, far];
+  const out = settleGroup(pile, [1, 2], 1, { x: 0.3, y: 0.3 });
+  const [o50, o1, o2, ofar] = out;
+  approx(o2.x - o1.x, STEP_X, 1e-9);
+  approx(o2.y - o1.y, STEP_Y, 1e-9);
+  assert.notDeepEqual(o50, pile[0]);
+  assert.ok(dist(o1, o50) >= PUSH_FACTOR * (rad(o1) + rad(o50)) - 1e-6);
+  assert.deepEqual(ofar, far);
+});
+
+test("settleGroup does not re-lay when moving away, does when moving towards", () => {
+  // about 5 mm apart: not linked, so only the direction check can decide
+  const lone = at(9, "20p", 0, 0);
+  const g = at(1, "20p", 0.05, 0);
+  const pile = [lone, g];
+  assert.equal(settleGroup(pile, [1], 1, { x: 0.04, y: 0 }), pile);
+  const out = settleGroup(pile, [1], 1, { x: 0.3, y: 0 });
+  assert.notEqual(out, pile);
+  approx(out[1].x, STEP_X);
+});
+
+test("a same-type coin too close to the bottom of a stack snaps to the top of the unit", () => {
+  const stack = stackAt([1, 2, 3], "20p", 0, 0, 40);
+  const top = stack[2];
+  const lone = at(9, "20p", -10.2 / PILE_WIDTH_MM, 0, 77);
+  const pile = [...stack, lone];
+  const out = settleGroup(pile, [9], 9, { x: -0.3, y: 0 });
+  assert.notEqual(out, pile);
+  const moved = out.find((e) => e.uid === 9);
+  approx(moved.x, top.x + STEP_X);
+  approx(moved.y, top.y + STEP_Y);
+  assert.equal(moved.rot, 40);
+  assert.equal(stackCounts(out).get(9), 4);
+});
+
+test("group members never react to each other, and a bad leader changes nothing", () => {
+  const pile = stackAt([1, 2, 3], "20p", 0, 0);
+  assert.equal(settleGroup(pile, [1, 2, 3], 1, { x: 0.3, y: 0.3 }), pile);
+  assert.equal(settleGroup(pile, [1, 2], 3, { x: 0.3, y: 0.3 }), pile);
+});
+
+test("settleGroup pass cap: 20 mixed coins at one spot settle without throwing", () => {
+  const ids = ["1p", "2p", "5p", "10p", "20p", "50p", "£1", "£2"];
+  const pile = Array.from({ length: 20 }, (_, i) => at(i + 1, ids[i % 8], 0, 0));
+  const out = settleGroup(pile, [1, 9], 1, null);
+  assert.deepEqual(out.map((e) => e.uid), pile.map((e) => e.uid));
+  for (const e of out) assert.ok(Math.abs(e.x) <= 0.5 && Math.abs(e.y) <= 0.5);
+});
+
+test("detachNudge moves +5 mm on both axes for a coin at negative x and y", () => {
+  const r = detachNudge({ x: -0.2, y: -0.2 });
+  approx(r.x, -0.2 + 5 / PILE_WIDTH_MM);
+  approx(r.y, -0.2 + 5 / PILE_HEIGHT_MM);
+});
+
+test("detachNudge moves -5 mm on both axes for a coin at positive x and y", () => {
+  const r = detachNudge({ x: 0.2, y: 0.3 });
+  approx(r.x, 0.2 - 5 / PILE_WIDTH_MM);
+  approx(r.y, 0.3 - 5 / PILE_HEIGHT_MM);
+});
+
+test("detachNudge treats exactly 0 as the positive direction", () => {
+  const r = detachNudge({ x: 0, y: 0 });
+  approx(r.x, 5 / PILE_WIDTH_MM);
+  approx(r.y, 5 / PILE_HEIGHT_MM);
+});
+
+test("detachNudge keeps edge coins inside the pile", () => {
+  const r = detachNudge({ x: 0.5, y: -0.5 });
+  approx(r.x, 0.5 - 5 / PILE_WIDTH_MM);
+  approx(r.y, -0.5 + 5 / PILE_HEIGHT_MM);
+  for (const c of [{ x: -0.5, y: 0.5 }, { x: 0.5, y: 0.5 }, { x: -0.5, y: -0.5 }]) {
+    const n = detachNudge(c);
+    assert.ok(Math.abs(n.x) <= 0.5 && Math.abs(n.y) <= 0.5);
+  }
+});
+
+test("detachNudge moves hypot(5, 5) mm when unclamped", () => {
+  const from = { x: 0.1, y: -0.1 };
+  const to = detachNudge(from);
+  approx(Math.hypot((to.x - from.x) * PILE_WIDTH_MM, (to.y - from.y) * PILE_HEIGHT_MM),
+    Math.hypot(DETACH_NUDGE_MM.x, DETACH_NUDGE_MM.y));
 });
