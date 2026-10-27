@@ -1,8 +1,9 @@
 import { formatPence, parseAmount, randomTarget, total } from "./game.js";
+import { createDwell } from "./dwell.js";
 import { announce, renderPile, renderTray, setText } from "./render.js";
 import {
   addToPile, canAdvance, clearPile, createState, nextRound,
-  removeFromPile, startGame, submitCheck,
+  removeFromPile, setDifficulty, startGame, submitCheck,
 } from "./state.js";
 
 const $ = (id) => document.getElementById(id);
@@ -10,8 +11,71 @@ const SCREENS = ["home", "custom", "play"];
 
 let state = createState();
 let shownMessage = state.message;
+let shownPile;
+
+const dwell = createDwell({
+  onReveal: (el) => el.classList.add("revealed"),
+  onHide: (el) => el.classList.remove("revealed"),
+});
+
+// :focus-visible is missing in old browsers; fall back to true so keyboard users still get the reveal
+function focusVisible(el) {
+  try { return el.matches(":focus-visible"); } catch { return true; }
+}
+
+function watchDwell(container) {
+  const coinOf = (e) => e.target.closest?.("[data-coin]");
+  container.addEventListener("pointerover", (e) => {
+    const coin = coinOf(e);
+    if (coin) dwell.start(coin);
+  });
+  container.addEventListener("pointerout", (e) => {
+    const coin = coinOf(e);
+    if (coin && !coin.contains(e.relatedTarget)) dwell.stop(coin);
+  });
+  container.addEventListener("focusin", (e) => {
+    const coin = coinOf(e);
+    if (coin && focusVisible(coin)) dwell.start(coin);
+  });
+  container.addEventListener("focusout", (e) => {
+    const coin = coinOf(e);
+    if (coin) dwell.stop(coin);
+  });
+  container.addEventListener("contextmenu", (e) => e.preventDefault());
+  // A long touch may not be followed by a click (Android long-press), so act on release
+  // when the press revealed the value; a click that does follow is then ignored.
+  container.addEventListener("pointerdown", () => { swallow = null; });
+  container.addEventListener("pointerup", (e) => {
+    if (e.pointerType === "mouse") return;
+    const coin = coinOf(e);
+    if (!coin || !coin.classList.contains("revealed")) return;
+    const id = coin.dataset.coin;
+    swallow = { id, container };
+    setTimeout(() => { if (swallow?.id === id) swallow = null; }, 500);
+    (container === $("play-tray") ? addCoin : removeCoin)(id);
+  });
+}
+
+let swallow = null;
+function takeSwallow(container, id) {
+  const hit = swallow && swallow.id === id && swallow.container === container;
+  swallow = null;
+  return hit;
+}
+
+function addCoin(id) {
+  update(addToPile(state, id));
+}
+
+function removeCoin(id) {
+  update(removeFromPile(state, id));
+  // the pile is re-rendered, so hand focus back to keep keyboard use flowing
+  const target = document.querySelector(`#play-pile [data-coin="${id}"]`) ?? $("play-tray").querySelector(`[data-coin="${id}"]`);
+  target.focus({ preventScroll: true });
+}
 
 function showScreen(name) {
+  dwell.cancelAll();
   for (const s of SCREENS) $(`screen-${s}`).hidden = s !== name;
   $(`screen-${name}`).querySelector("h1").focus();
 }
@@ -19,7 +83,13 @@ function showScreen(name) {
 function render() {
   const endless = state.mode === "endless";
   setText($("play-target"), formatPence(state.target));
-  renderPile($("play-pile"), state.pile);
+  if (state.pile !== shownPile) {
+    renderPile($("play-pile"), state.pile);
+    shownPile = state.pile;
+    // drop dwells on rebuilt pile coins but keep the one on a tray coin still under the pointer/focus
+    dwell.prune((el) => el.isConnected);
+  }
+  document.querySelector(".board").dataset.difficulty = state.difficulty;
   setText($("play-total"), `Your total: ${formatPence(total(state.pile))}`);
   // each submitCheck makes a new message object, so a repeated hint is announced again
   if (state.message !== shownMessage) {
@@ -53,19 +123,20 @@ function beginRound(next) {
 }
 
 renderTray($("play-tray"));
+watchDwell($("play-tray"));
+watchDwell($("play-pile"));
+
+document.querySelector(".difficulty").addEventListener("change", (e) => {
+  update(setDifficulty(state, e.target.value));
+});
 
 $("play-tray").addEventListener("click", (e) => {
   const btn = e.target.closest("[data-coin]");
-  if (btn) update(addToPile(state, btn.dataset.coin));
+  if (btn && !takeSwallow($("play-tray"), btn.dataset.coin)) addCoin(btn.dataset.coin);
 });
 $("play-pile").addEventListener("click", (e) => {
   const btn = e.target.closest("[data-coin]");
-  if (!btn) return;
-  const id = btn.dataset.coin;
-  update(removeFromPile(state, id));
-  // the pile is re-rendered, so hand focus back to keep keyboard use flowing
-  const target = document.querySelector(`#play-pile [data-coin="${id}"]`) ?? $("play-tray").querySelector(`[data-coin="${id}"]`);
-  target.focus({ preventScroll: true });
+  if (btn && !takeSwallow($("play-pile"), btn.dataset.coin)) removeCoin(btn.dataset.coin);
 });
 $("btn-clear").addEventListener("click", () => update(clearPile(state)));
 $("btn-check").addEventListener("click", () => {

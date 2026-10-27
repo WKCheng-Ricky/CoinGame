@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   ADVANCE_DELAY_MS, createState, startGame, nextRound,
   addToPile, removeFromPile, clearPile, submitCheck, canAdvance,
+  setDifficulty,
 } from "../src/state.js";
 
 const EXACT_395 = { "£2": 1, "£1": 1, "50p": 1, "20p": 2, "5p": 1 };
@@ -12,6 +13,7 @@ test("createState has the expected shape", () => {
   assert.deepEqual(createState(), {
     mode: "endless", target: 0, pile: {}, rounds: 0, solved: false, solvedAt: 0,
     message: { text: "", kind: "" },
+    difficulty: "normal",
   });
   assert.equal(ADVANCE_DELAY_MS, 400);
 });
@@ -93,4 +95,26 @@ test("canAdvance needs a solved round and 400ms", () => {
   const solved = { ...s, solved: true, solvedAt: 1000 };
   assert.equal(canAdvance(solved, 1399), false);
   assert.equal(canAdvance(solved, 1400), true);
+});
+
+test("setDifficulty switches between easy and normal without touching the round", () => {
+  const s = withPile(startGame(createState(), "endless", 395), { "£1": 1 });
+  const easy = setDifficulty(s, "easy");
+  assert.equal(easy.difficulty, "easy");
+  assert.deepEqual(easy.pile, s.pile);
+  assert.equal(easy.target, 395);
+  assert.equal(setDifficulty(easy, "normal").difficulty, "normal");
+});
+
+test("setDifficulty ignores unknown values and returns the same object", () => {
+  const s = createState();
+  assert.equal(setDifficulty(s, "hard"), s);
+  assert.equal(setDifficulty(s, undefined), s);
+});
+
+test("startGame and nextRound keep the difficulty", () => {
+  const easy = setDifficulty(createState(), "easy");
+  const started = startGame(easy, "custom", 150);
+  assert.equal(started.difficulty, "easy");
+  assert.equal(nextRound(started, 200).difficulty, "easy");
 });

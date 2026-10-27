@@ -11,6 +11,11 @@
     <section id="screen-home">
       <h1 tabindex="-1">Coin Game</h1>
       <p>Make the amount using UK coins.</p>
+      <fieldset class="difficulty">
+        <legend>Difficulty</legend>
+        <label><input type="radio" name="difficulty" id="diff-normal" value="normal" checked autocomplete="off"> Normal: read the coins yourself</label>
+        <label><input type="radio" name="difficulty" id="diff-easy" value="easy" autocomplete="off"> Easy: values always shown</label>
+      </fieldset>
       <div class="stack-col">
         <button id="btn-endless" class="primary">Endless</button>
         <button id="btn-custom">Custom</button>
@@ -33,7 +38,7 @@
     <section id="screen-play" hidden>
       <h1 id="play-heading" class="target" tabindex="-1"><span class="label">Make</span> <span id="play-target"></span></h1>
       <p id="play-rounds" class="rounds" hidden></p>
-      <div class="board">
+      <div class="board" data-difficulty="normal">
         <div class="pile-area">
           <h2>Your coins</h2>
           <div id="play-pile" class="pile"></div>

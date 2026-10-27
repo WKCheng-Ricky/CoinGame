@@ -36,3 +36,9 @@ test("ringed coins draw two shapes, plain coins draw one", () => {
   assert.equal(shapes("£2"), 2);
   assert.equal(shapes("10p"), 1);
 });
+
+test("every coin label is tagged so CSS can hide it", () => {
+  for (const coin of COINS) {
+    assert.ok(coinSvg(coin).includes('<text class="coin-label"'), coin.id);
+  }
+});

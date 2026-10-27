@@ -46,6 +46,16 @@ button:focus-visible, input:focus-visible { outline: 3px solid #1a73e8; outline-
 
 input { width: 100%; padding: 0.5rem 0.75rem; border: 2px solid var(--line); font-size: 1.25rem; }
 label { display: block; margin: 0.5rem 0 0.25rem; }
+input[type="radio"] { width: auto; min-height: 0; }
+
+.difficulty { max-width: 16rem; margin: 0.75rem 0; padding: 0.5rem 0.75rem; border: 2px solid var(--line); border-radius: 0.8rem; background: var(--panel); }
+.difficulty label { display: flex; align-items: center; gap: 0.5rem; min-height: 44px; margin: 0; }
+.difficulty input { flex: none; }
+
+.coin-label { transition: opacity 200ms; }
+.board[data-difficulty="normal"] .coin-label { opacity: 0; }
+.board[data-difficulty="normal"] .revealed .coin-label { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .coin-label { transition: none; } }
 
 .stack-col { display: flex; flex-direction: column; gap: 0.75rem; max-width: 16rem; }
 .row { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 0.75rem 0; }
@@ -111,3 +121,5 @@ label { display: block; margin: 0.5rem 0 0.25rem; }
 
 .pile:empty::before { content: "Tap a coin to add it"; color: #5a6070; }
 .board.locked .coin, .board.locked .stack { opacity: 0.5; }
+
+.coin, .stack { -webkit-touch-callout: none; user-select: none; }
