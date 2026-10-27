@@ -1,9 +1,11 @@
-import { describePile, formatPence, parseAmount, randomTarget, total } from "./game.js";
+import { describePile, detachNudge, formatPence, parseAmount, randomTarget, total, unitUids } from "./game.js";
 import { createDwell } from "./dwell.js";
-import { announce, renderPile, renderTray, setText } from "./render.js";
+import { createDrag, createTrayDrag } from "./drag.js";
+import { announce, renderPile, renderTray, setText, showStackBadges } from "./render.js";
 import {
   addToPile, canAdvance, clearPile, createState, nextRound,
-  removeFromPile, setDifficulty, startGame, submitCheck,
+  addToPileAt, moveCoin, moveGroup, removeFromPile, settleCoin, settleGroupCoins, setDifficulty,
+  startGame, submitCheck,
 } from "./state.js";
 
 const $ = (id) => document.getElementById(id);
@@ -12,6 +14,7 @@ const SCREENS = ["home", "custom", "play"];
 let state = createState();
 let shownMessage = state.message;
 let shownPile;
+let detachedUid = null; // the held, detached coin: it does not count toward stack badges
 
 const dwell = createDwell({
   onReveal: (el) => el.classList.add("revealed"),
@@ -49,6 +52,8 @@ function watchDwell(container) {
     if (e.pointerType === "mouse") return;
     const coin = coinOf(e);
     if (!coin || !coin.classList.contains("revealed")) return;
+    if (container === $("play-pile") && drag?.suppressed()) return;
+    if (container === $("play-tray") && trayDrag?.suppressed()) return;
     const key = coin.dataset.uid ?? coin.dataset.coin;
     swallow = { id: key, container };
     setTimeout(() => { if (swallow?.id === key) swallow = null; }, 500);
@@ -57,6 +62,8 @@ function watchDwell(container) {
 }
 
 let swallow = null;
+let drag;
+let trayDrag;
 function takeSwallow(container, id) {
   // a pile click may land on a different coin than the one just removed, so any pile click is swallowed
   const hit = swallow && swallow.container === container && (container === $("play-pile") || swallow.id === id);
@@ -91,7 +98,7 @@ function render() {
   const endless = state.mode === "endless";
   setText($("play-target"), formatPence(state.target));
   if (state.pile !== shownPile) {
-    renderPile($("play-pile"), state.pile);
+    renderPile($("play-pile"), state.pile, detachedUid);
     setText($("play-pile-summary"), describePile(state.pile));
     shownPile = state.pile;
     // drop dwells on removed pile coins (untouched pile and tray coins keep theirs)
@@ -130,8 +137,75 @@ function beginRound(next) {
   $("play-heading").focus();
 }
 
+function moveAndRefocus(uid, x, y) {
+  const entry = state.pile.find((e) => e.uid === uid);
+  if (!entry) return;
+  const from = { x: entry.x, y: entry.y };
+  const el = $("play-pile").querySelector(`[data-uid="${uid}"]`);
+  const focused = document.activeElement;
+  const focusedUid = focused?.closest?.("#play-pile [data-uid]") ? focused.dataset.uid : null;
+  update(moveCoin(state, uid, x, y));
+  $("play-pile").offsetWidth; // flush styles so the coin lands where released before it glides
+  el?.style.removeProperty("transition"); // set by the drop in drag.js
+  update(settleCoin(state, uid, from));
+  if (focusedUid !== null) $("play-pile").querySelector(`[data-uid="${focusedUid}"]`)?.focus({ preventScroll: true });
+}
+
+function moveGroupAndRefocus(uids, dx, dy, leaderUid) {
+  const leader = state.pile.find((e) => e.uid === leaderUid);
+  if (!leader) return;
+  const from = { x: leader.x, y: leader.y };
+  const els = uids.map((uid) => $("play-pile").querySelector(`[data-uid="${uid}"]`));
+  const focused = document.activeElement;
+  const focusedUid = focused?.closest?.("#play-pile [data-uid]") ? focused.dataset.uid : null;
+  update(moveGroup(state, uids, dx, dy));
+  $("play-pile").offsetWidth; // flush styles so the group lands where released before it glides
+  for (const el of els) el?.style.removeProperty("transition"); // set by the drop in drag.js
+  update(settleGroupCoins(state, uids, leaderUid, from));
+  // the group is re-ordered with replaceChildren, which drops focus, so restore it by uid
+  if (focusedUid !== null) $("play-pile").querySelector(`[data-uid="${focusedUid}"]`)?.focus({ preventScroll: true });
+}
+
+function onDragStart(el) {
+  if (!el.classList.contains("revealed")) dwell.stop(el);
+}
+
+function dropFromTray(coinId, x, y) {
+  const next = addToPileAt(state, coinId, x, y);
+  if (next === state) return;
+  update(next);
+  $("play-pile").offsetWidth; // flush styles so the coin lands where released before it glides
+  update(settleCoin(state, state.pile[state.pile.length - 1].uid, null));
+}
+
 renderTray($("play-tray"));
+// created before the tray's watchDwell so its listeners run first
+trayDrag = createTrayDrag($("play-tray"), {
+  onDrop: dropFromTray, onDragStart, isLocked: () => state.solved, pileEl: $("play-pile"),
+});
 watchDwell($("play-tray"));
+// created before the pile's watchDwell so its listeners run first
+drag = createDrag($("play-pile"), {
+  onMove: moveAndRefocus,
+  onMoveGroup: moveGroupAndRefocus,
+  getGroup: (uid) => unitUids(state.pile, uid),
+  onDragStart,
+  isLocked: () => state.solved,
+  onDetach: (uid) => {
+    detachedUid = uid;
+    showStackBadges($("play-pile"), state.pile, uid);
+  },
+  onDetachEnd: () => {
+    detachedUid = null;
+    showStackBadges($("play-pile"), state.pile, null);
+  },
+  onDetachRelease: (uid) => {
+    const entry = state.pile.find((e) => e.uid === uid);
+    if (!entry || state.solved) return;
+    const { x, y } = detachNudge(entry);
+    moveAndRefocus(uid, x, y);
+  },
+});
 watchDwell($("play-pile"));
 
 document.querySelector(".difficulty").addEventListener("change", (e) => {
@@ -145,6 +219,18 @@ $("play-tray").addEventListener("click", (e) => {
 $("play-pile").addEventListener("click", (e) => {
   const btn = e.target.closest("[data-uid]");
   if (btn && !takeSwallow($("play-pile"), btn.dataset.uid)) removeCoin(btn.dataset.uid);
+});
+const ARROWS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+$("play-pile").addEventListener("keydown", (e) => {
+  const dir = ARROWS[e.key];
+  const btn = e.target.closest?.("[data-uid]");
+  if (!dir || !btn || e.ctrlKey || e.altKey || e.metaKey) return;
+  if (drag.active()) return;
+  e.preventDefault();
+  const entry = state.pile.find((p) => p.uid === Number(btn.dataset.uid));
+  if (!entry) return;
+  const step = e.shiftKey ? 0.1 : 0.02;
+  moveAndRefocus(entry.uid, entry.x + dir[0] * step, entry.y + dir[1] * step);
 });
 $("btn-clear").addEventListener("click", () => update(clearPile(state)));
 $("btn-check").addEventListener("click", () => {

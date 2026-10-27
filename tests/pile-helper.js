@@ -1,4 +1,4 @@
-// Test helpers for the messy pile placement tests.
+// Test helpers for the pile placement, settle and move tests.
 
 // mulberry32: small seeded PRNG returning values in [0, 1).
 export function seeded(seed) {

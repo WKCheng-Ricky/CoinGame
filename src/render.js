@@ -1,5 +1,5 @@
 import { COINS } from "./coins.js";
-import { PILE_HEIGHT_MM, PILE_MARGIN_MM, PILE_WIDTH_MM, pileBox } from "./game.js";
+import { PILE_HEIGHT_MM, PILE_MARGIN_MM, PILE_WIDTH_MM, pileBox, stackCounts } from "./game.js";
 
 const SIDES = { heptagon: 7, dodecagon: 12 };
 const STROKE = "#00000055";
@@ -26,6 +26,14 @@ export function coinSvg(coin) {
   return `<svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">${outline}${inner}${label}</svg>`;
 }
 
+function placeCoin(btn, entry) {
+  const { left, top } = pileBox(entry);
+  const l = `${left}%`, t = `${top}%`, r = `${entry.rot}deg`;
+  if (btn.style.left !== l) btn.style.left = l;
+  if (btn.style.top !== t) btn.style.top = t;
+  if (btn.style.getPropertyValue("--rot") !== r) btn.style.setProperty("--rot", r);
+}
+
 function coinButton(coin, className, ariaLabel, extraHtml = "") {
   const btn = document.createElement("button");
   btn.type = "button";
@@ -41,7 +49,7 @@ export function renderTray(container) {
   container.replaceChildren(...COINS.map((coin) => coinButton(coin, "coin", `Add ${coin.label}`)));
 }
 
-export function renderPile(container, pile) {
+export function renderPile(container, pile, excludeUid = null) {
   container.style.setProperty("--pile-w-mm", PILE_WIDTH_MM + 2 * PILE_MARGIN_MM);
   container.style.setProperty("--pile-h-mm", PILE_HEIGHT_MM + 2 * PILE_MARGIN_MM);
   const existing = new Map([...container.children].map((el) => [el.dataset.uid, el]));
@@ -55,16 +63,45 @@ export function renderPile(container, pile) {
     if (!btn) {
       const coin = COINS.find((c) => c.id === entry.coinId);
       btn = coinButton(coin, "pile-coin settle", `Remove ${coin.label}`);
-      const { left, top } = pileBox(entry);
+      btn.setAttribute("aria-description", "Use arrow keys to move");
       btn.dataset.uid = key;
-      btn.style.left = `${left}%`;
-      btn.style.top = `${top}%`;
-      btn.style.setProperty("--rot", `${entry.rot}deg`);
+      placeCoin(btn, entry);
+      btn.addEventListener("animationend", () => btn.classList.remove("settle"), { once: true });
       container.append(btn);
+    } else {
+      placeCoin(btn, entry);
     }
     return btn;
   });
   if (ordered.some((el, i) => container.children[i] !== el)) container.replaceChildren(...ordered);
+  showStackBadges(container, pile, excludeUid);
+}
+
+// excludeUid (a detached coin) does not count: it gets no badge and its former stack shows the reduced count
+export function showStackBadges(container, pile, excludeUid = null) {
+  const counts = stackCounts(excludeUid === null ? pile : pile.filter((e) => e.uid !== excludeUid));
+  for (const btn of container.children) {
+    const uid = Number(btn.dataset.uid);
+    updateBadge(btn, uid === excludeUid ? undefined : counts.get(uid));
+  }
+}
+
+function updateBadge(btn, n) {
+  let badge = btn.querySelector(":scope > .stack-badge");
+  if (!n) {
+    if (badge) badge.remove();
+    btn.setAttribute("aria-description", "Use arrow keys to move");
+    return;
+  }
+  if (!badge) {
+    badge = document.createElement("span");
+    badge.className = "stack-badge";
+    badge.setAttribute("aria-hidden", "true");
+    btn.append(badge);
+  }
+  const text = "×" + n;
+  if (badge.textContent !== text) badge.textContent = text;
+  btn.setAttribute("aria-description", `Stack of ${n}. Use arrow keys to move`);
 }
 
 export function setText(el, text) {

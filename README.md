@@ -10,8 +10,12 @@ A lightweight, dependency-free web game: match a target amount using UK coins
 - **Difficulty:** Easy always shows each coin's value. Normal hides it; hover,
   hold or focus a coin for 2 seconds to read it.
 
-Tap a coin in the tray to add it, tap a coin in your pile to remove it, and
-press Check when the total matches.
+Tap a coin in the tray to add it, tap a coin in your pile to remove it. Coins
+in the pile can be dragged (or moved one at a time with the arrow keys), and
+coins can also be dragged from the tray to a spot in the pile. Same coins that
+touch stack, and a stack shows its count (×2, ×3, ...); different coins push
+apart. Dragging a stack moves it together; hold a coin for 1 second to take it
+off the stack, and it stays off when you let go. Press Check when the total matches.
 
 Plain HTML, CSS and JavaScript (ES modules). No build step, no dependencies.
 
@@ -41,7 +45,10 @@ Any static host works, e.g. GitHub Pages.
 ## Layout
 
 - `src/coins.js`: coin data
-- `src/game.js`: pure game logic (money is integer pence)
+- `src/game.js`: pure game logic (money is integer pence, pile placement and settling)
+- `src/state.js`: pure game state transitions
+- `src/drag.js`: drag geometry and the pile and tray drag controllers
+- `src/dwell.js`: hold-to-reveal timers
 - `src/render.js`: coin SVGs and DOM rendering
-- `src/main.js`: state and event wiring
-- `docs/superpowers/`: design spec and implementation plan
+- `src/main.js`: app state and event wiring
+- `docs/superpowers/`: design specs and implementation plans
