@@ -10,7 +10,7 @@ A lightweight, dependency-free web game: match a target amount using UK coins
 - **Difficulty:** Easy always shows each coin's value. Normal hides it; hover,
   hold or focus a coin for 2 seconds to read it.
 
-Tap a coin in the tray to add it, tap a stack in your pile to remove one, and
+Tap a coin in the tray to add it, tap a coin in your pile to remove it, and
 press Check when the total matches.
 
 Plain HTML, CSS and JavaScript (ES modules). No build step, no dependencies.

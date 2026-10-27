@@ -1,4 +1,4 @@
-import { formatPence, parseAmount, randomTarget, total } from "./game.js";
+import { describePile, formatPence, parseAmount, randomTarget, total } from "./game.js";
 import { createDwell } from "./dwell.js";
 import { announce, renderPile, renderTray, setText } from "./render.js";
 import {
@@ -49,16 +49,17 @@ function watchDwell(container) {
     if (e.pointerType === "mouse") return;
     const coin = coinOf(e);
     if (!coin || !coin.classList.contains("revealed")) return;
-    const id = coin.dataset.coin;
-    swallow = { id, container };
-    setTimeout(() => { if (swallow?.id === id) swallow = null; }, 500);
-    (container === $("play-tray") ? addCoin : removeCoin)(id);
+    const key = coin.dataset.uid ?? coin.dataset.coin;
+    swallow = { id: key, container };
+    setTimeout(() => { if (swallow?.id === key) swallow = null; }, 500);
+    (container === $("play-tray") ? addCoin : removeCoin)(key);
   });
 }
 
 let swallow = null;
 function takeSwallow(container, id) {
-  const hit = swallow && swallow.id === id && swallow.container === container;
+  // a pile click may land on a different coin than the one just removed, so any pile click is swallowed
+  const hit = swallow && swallow.container === container && (container === $("play-pile") || swallow.id === id);
   swallow = null;
   return hit;
 }
@@ -67,10 +68,16 @@ function addCoin(id) {
   update(addToPile(state, id));
 }
 
-function removeCoin(id) {
-  update(removeFromPile(state, id));
+function removeCoin(uidText) {
+  const uid = Number(uidText);
+  const entry = state.pile.find((e) => e.uid === uid);
+  if (!entry) return;
+  const next = removeFromPile(state, uid);
+  if (next === state) return;
+  update(next);
   // the pile is re-rendered, so hand focus back to keep keyboard use flowing
-  const target = document.querySelector(`#play-pile [data-coin="${id}"]`) ?? $("play-tray").querySelector(`[data-coin="${id}"]`);
+  const top = [...document.querySelectorAll("#play-pile .pile-coin")].pop();
+  const target = top ?? $("play-tray").querySelector(`[data-coin="${entry.coinId}"]`);
   target.focus({ preventScroll: true });
 }
 
@@ -85,8 +92,9 @@ function render() {
   setText($("play-target"), formatPence(state.target));
   if (state.pile !== shownPile) {
     renderPile($("play-pile"), state.pile);
+    setText($("play-pile-summary"), describePile(state.pile));
     shownPile = state.pile;
-    // drop dwells on rebuilt pile coins but keep the one on a tray coin still under the pointer/focus
+    // drop dwells on removed pile coins (untouched pile and tray coins keep theirs)
     dwell.prune((el) => el.isConnected);
   }
   document.querySelector(".board").dataset.difficulty = state.difficulty;
@@ -106,7 +114,7 @@ function render() {
   $("btn-change").hidden = !(state.solved && !endless);
 
   document.querySelector(".board").classList.toggle("locked", state.solved);
-  for (const btn of document.querySelectorAll(".coin, .stack")) {
+  for (const btn of document.querySelectorAll(".coin, .pile-coin")) {
     if (state.solved) btn.setAttribute("aria-disabled", "true");
     else btn.removeAttribute("aria-disabled");
   }
@@ -135,8 +143,8 @@ $("play-tray").addEventListener("click", (e) => {
   if (btn && !takeSwallow($("play-tray"), btn.dataset.coin)) addCoin(btn.dataset.coin);
 });
 $("play-pile").addEventListener("click", (e) => {
-  const btn = e.target.closest("[data-coin]");
-  if (btn && !takeSwallow($("play-pile"), btn.dataset.coin)) removeCoin(btn.dataset.coin);
+  const btn = e.target.closest("[data-uid]");
+  if (btn && !takeSwallow($("play-pile"), btn.dataset.uid)) removeCoin(btn.dataset.uid);
 });
 $("btn-clear").addEventListener("click", () => update(clearPile(state)));
 $("btn-check").addEventListener("click", () => {

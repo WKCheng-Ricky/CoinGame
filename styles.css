@@ -70,7 +70,16 @@ input[type="radio"] { width: auto; min-height: 0; }
 @media (min-width: 48rem) { .board { grid-template-columns: 1fr 1fr; } }
 .pile-area, .tray-area { background: var(--panel); border: 2px solid var(--line); border-radius: 0.8rem; padding: 0.75rem; }
 
-.pile { display: flex; flex-wrap: wrap; gap: 0.5rem; min-height: 5.5rem; align-items: center; }
+.pile {
+  position: relative;
+  container-type: inline-size;
+  width: min(100%, calc(var(--pile-w-mm, 138.4) * 0.17rem));
+  margin-inline: auto;
+  aspect-ratio: var(--pile-w-mm, 138.4) / var(--pile-h-mm, 118.4);
+  background: #faf8f3;
+  border: 2px dashed var(--line);
+  border-radius: 0.8rem;
+}
 .total { margin: 0.5rem 0 0; font-size: 1.4rem; font-weight: 700; }
 
 .tray {
@@ -83,7 +92,7 @@ input[type="radio"] { width: auto; min-height: 0; }
 }
 
 /* The button keeps a 44px tap area; the drawn coin keeps its real relative size. */
-.coin, .stack {
+.coin, .pile-coin {
   position: relative;
   display: grid;
   place-items: center;
@@ -93,33 +102,25 @@ input[type="radio"] { width: auto; min-height: 0; }
   min-width: 44px;
   min-height: 44px;
 }
-.coin svg, .stack svg { display: block; aspect-ratio: 1; height: auto; }
-.stack svg { width: calc(var(--d) * 0.17rem); }
+.coin svg, .pile-coin svg { display: block; aspect-ratio: 1; height: auto; }
+.pile-coin { position: absolute; translate: -50% -50%; border-radius: 50%; min-width: 0; min-height: 0; }
+.pile-coin:focus-visible { z-index: 1; }
+.pile-coin svg { width: calc(var(--d) / var(--pile-w-mm) * 100cqw); transform: rotate(var(--rot)); pointer-events: none; }
+.pile-coin .coin-label { transform: rotate(calc(-1 * var(--rot))); transform-box: fill-box; transform-origin: center; }
+.settle { animation: settle 150ms ease-out; }
+@keyframes settle { from { opacity: 0; transform: scale(1.15); } }
+@media (prefers-reduced-motion: reduce) { .settle { animation: none; } }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 /* In the tray, never let a coin outgrow its column (cqw = tray width). */
 .coin svg { width: calc(var(--d) * min(0.17rem, 0.75cqw)); }
-.coin:active, .stack:active { transform: scale(0.94); }
-
-.badge {
-  position: absolute;
-  right: -0.35rem;
-  bottom: -0.35rem;
-  min-width: 1.6rem;
-  padding: 0 0.3rem;
-  border-radius: 1rem;
-  background: var(--ink);
-  color: #fff;
-  font-size: 0.85rem;
-  font-weight: 700;
-  line-height: 1.6rem;
-  text-align: center;
-}
+.coin:active, .pile-coin:active { transform: scale(0.94); }
 
 .message { min-height: 1.6em; margin: 0.75rem 0 0; font-size: 1.15rem; font-weight: 600; text-align: center; }
 .message.success { color: var(--good); }
 .message.hint { color: var(--hint); }
 .actions { justify-content: center; }
 
-.pile:empty::before { content: "Tap a coin to add it"; color: #5a6070; }
-.board.locked .coin, .board.locked .stack { opacity: 0.5; }
+.pile:empty::before { content: "Tap a coin to add it"; color: #5a6070; position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
+.board.locked .coin, .board.locked .pile-coin { opacity: 0.5; }
 
-.coin, .stack { -webkit-touch-callout: none; user-select: none; }
+.coin, .pile-coin { -webkit-touch-callout: none; user-select: none; }
