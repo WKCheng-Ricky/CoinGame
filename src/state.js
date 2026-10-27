@@ -7,16 +7,21 @@ const NO_MESSAGE = { text: "", kind: "" };
 export function createState() {
   return {
     mode: "endless", target: 0, pile: {}, rounds: 0, solved: false, solvedAt: 0,
-    message: NO_MESSAGE,
+    message: NO_MESSAGE, difficulty: "normal",
   };
 }
 
+export function setDifficulty(state, difficulty) {
+  if (difficulty !== "easy" && difficulty !== "normal") return state;
+  return { ...state, difficulty };
+}
+
 export function startGame(state, mode, target) {
-  return { ...createState(), mode, target };
+  return { ...createState(), mode, target, difficulty: state.difficulty };
 }
 
 export function nextRound(state, target) {
-  return { ...createState(), mode: state.mode, rounds: state.rounds, target };
+  return { ...createState(), mode: state.mode, rounds: state.rounds, target, difficulty: state.difficulty };
 }
 
 function changePile(state, update) {

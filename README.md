@@ -7,6 +7,8 @@ A lightweight, dependency-free web game: match a target amount using UK coins
   Back to stop.
 - **Custom:** type an amount (up to £99.99) and build it with any combination
   of coins.
+- **Difficulty:** Easy always shows each coin's value. Normal hides it; hover,
+  hold or focus a coin for 2 seconds to read it.
 
 Tap a coin in the tray to add it, tap a stack in your pile to remove one, and
 press Check when the total matches.

@@ -21,7 +21,7 @@ export function coinSvg(coin) {
     ? `<circle cx="50" cy="50" r="31" fill="${coin.ring}" stroke="${STROKE}" stroke-width="2"/>`
     : "";
   const size = coin.label.length > 2 ? 28 : 34;
-  const label = `<text x="50" y="50" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif" font-weight="700" font-size="${size}" fill="#222">${coin.label}</text>`;
+  const label = `<text class="coin-label" x="50" y="50" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif" font-weight="700" font-size="${size}" fill="#222">${coin.label}</text>`;
   return `<svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">${outline}${inner}${label}</svg>`;
 }
 
