@@ -49,7 +49,11 @@ export function renderTray(container) {
   container.replaceChildren(...COINS.map((coin) => coinButton(coin, "coin", `Add ${coin.label}`)));
 }
 
-export function renderPile(container, pile, excludeUid = null) {
+export function coinLabel(coin, removable) {
+  return removable ? `Remove ${coin.label}` : `${coin.label} coin`;
+}
+
+export function renderPile(container, pile, excludeUid = null, removable = true) {
   container.style.setProperty("--pile-w-mm", PILE_WIDTH_MM + 2 * PILE_MARGIN_MM);
   container.style.setProperty("--pile-h-mm", PILE_HEIGHT_MM + 2 * PILE_MARGIN_MM);
   const existing = new Map([...container.children].map((el) => [el.dataset.uid, el]));
@@ -60,15 +64,18 @@ export function renderPile(container, pile, excludeUid = null) {
   const ordered = pile.map((entry) => {
     const key = String(entry.uid);
     let btn = existing.get(key);
+    // uids restart per deal, so a reused uid may now hold a different coin: rebuild it
+    if (btn && btn.dataset.coin !== entry.coinId) { btn.remove(); btn = undefined; }
     if (!btn) {
       const coin = COINS.find((c) => c.id === entry.coinId);
-      btn = coinButton(coin, "pile-coin settle", `Remove ${coin.label}`);
+      btn = coinButton(coin, "pile-coin settle", coinLabel(coin, removable));
       btn.setAttribute("aria-description", "Use arrow keys to move");
       btn.dataset.uid = key;
       placeCoin(btn, entry);
       btn.addEventListener("animationend", () => btn.classList.remove("settle"), { once: true });
       container.append(btn);
     } else {
+      btn.setAttribute("aria-label", coinLabel(COINS.find((c) => c.id === entry.coinId), removable));
       placeCoin(btn, entry);
     }
     return btn;

@@ -1,5 +1,7 @@
 import { COINS } from "./coins.js";
-import { check, clampPosition, formatPence, placeCoin, settlePile, settleGroup } from "./game.js";
+import {
+  check, checkAnswer, clampPosition, formatPence, placeCoin, placeHandfulCoin, randomHandful, settlePile, settleGroup,
+} from "./game.js";
 
 export const ADVANCE_DELAY_MS = 400;
 
@@ -25,22 +27,64 @@ export function nextRound(state, target) {
   return { ...createState(), mode: state.mode, rounds: state.rounds, target, difficulty: state.difficulty };
 }
 
-export function addToPile(state, coinId, rng = Math.random) {
-  const coin = COINS.find((c) => c.id === coinId);
-  if (state.solved || !coin) return state;
-  const entry = { uid: state.nextUid, coinId, ...placeCoin(state.pile, coin, rng) };
+function placeAndSettle(state, coin, place, rng) {
+  const entry = { uid: state.nextUid, coinId: coin.id, ...place(state.pile, coin, rng) };
   const pile = settlePile([...state.pile, entry], entry.uid, null);
   return { ...state, pile, nextUid: state.nextUid + 1, message: NO_MESSAGE };
 }
 
+function dealHandful(state, ids, rng) {
+  const empty = { ...state, pile: [], nextUid: 1, solved: false, solvedAt: 0, message: NO_MESSAGE };
+  return ids.reduce((s, id) => placeAndSettle(s, COINS.find((c) => c.id === id), placeHandfulCoin, rng), empty);
+}
+
+export function startCashier(state, rng = Math.random) {
+  const fresh = { ...createState(), mode: "cashier", difficulty: state.difficulty };
+  return dealHandful(fresh, randomHandful(rng), rng);
+}
+
+export function nextCustomer(state, rng = Math.random) {
+  const previous = state.pile.map((e) => e.coinId);
+  return dealHandful(
+    { ...createState(), mode: state.mode, rounds: state.rounds, difficulty: state.difficulty },
+    randomHandful(rng, previous),
+    rng,
+  );
+}
+
+export function submitAnswer(state, pence, now) {
+  if (state.solved) return state;
+  const result = checkAnswer(state.pile, pence);
+  if (result === "exact") {
+    return {
+      ...state,
+      solved: true,
+      solvedAt: now,
+      rounds: state.rounds + 1,
+      message: { text: `Correct! That is ${formatPence(pence)}.`, kind: "success" },
+    };
+  }
+  return { ...state, message: { text: result === "over" ? "Too high" : "Too low", kind: "hint" } };
+}
+
+export function isContinuous(state) {
+  return state.mode === "endless" || state.mode === "cashier";
+}
+
+export function addToPile(state, coinId, rng = Math.random) {
+  const coin = COINS.find((c) => c.id === coinId);
+  if (state.solved || state.mode === "cashier" || !coin) return state;
+  return placeAndSettle(state, coin, placeCoin, rng);
+}
+
 export function addToPileAt(state, coinId, x, y, rng = Math.random) {
-  if (state.solved || !COINS.some((c) => c.id === coinId)) return state;
+  if (state.solved || state.mode === "cashier" || !COINS.some((c) => c.id === coinId)) return state;
   const entry = { uid: state.nextUid, coinId, ...clampPosition(x, y), rot: Math.floor(rng() * 360) };
   return { ...state, pile: [...state.pile, entry], nextUid: state.nextUid + 1, message: NO_MESSAGE };
 }
 
 export function removeFromPile(state, uid) {
-  if (state.solved || !state.pile.some((e) => e.uid === uid)) return state;
+  if (state.solved || state.mode === "cashier" || !state.pile.some((e) => e.uid === uid)) return state;
   return { ...state, pile: state.pile.filter((e) => e.uid !== uid), message: NO_MESSAGE };
 }
 
@@ -83,7 +127,7 @@ export function settleGroupCoins(state, uids, leaderUid, from) {
 }
 
 export function clearPile(state) {
-  if (state.solved) return state;
+  if (state.solved || state.mode === "cashier") return state;
   return { ...state, pile: [], message: NO_MESSAGE };
 }
 

@@ -27,10 +27,10 @@ export function summarisePile(pile) {
   return counts;
 }
 
-export function describePile(pile) {
+export function describePile(pile, intro = "In the pile") {
   const counts = summarisePile(pile);
   const parts = COINS.filter((c) => counts[c.id]).map((c) => `${counts[c.id]} × ${c.id}`);
-  return parts.length ? `In the pile: ${parts.join(", ")}` : "The pile is empty.";
+  return parts.length ? `${intro}: ${parts.join(", ")}` : "The pile is empty.";
 }
 
 export function parseAmount(text) {
@@ -54,6 +54,24 @@ export function randomTarget(previous, rng = Math.random) {
   let n = 1 + Math.floor(rng() * (MAX_RANDOM_PENCE - 1));
   if (n >= previous) n++;
   return n;
+}
+
+export const MAX_HANDFUL = 12;
+
+export function randomHandful(rng = Math.random, previous = []) {
+  const draw = () => {
+    const count = 2 + Math.floor(rng() * (MAX_HANDFUL - 1));
+    return Array.from({ length: count }, () => COINS[Math.floor(rng() * COINS.length)].id);
+  };
+  const key = (ids) => [...ids].sort().join(",");
+  const first = draw();
+  return key(first) === key(previous) ? draw() : first;
+}
+
+export function checkAnswer(pile, pence) {
+  const result = check(pile, pence);
+  if (result === "exact") return "exact";
+  return result === "under" ? "over" : "under";
 }
 
 export const PILE_WIDTH_MM = 110;
@@ -86,6 +104,17 @@ export function placeCoin(pile, coin, rng = Math.random) {
   const spot = found ?? best;
   const rot = Math.floor(rng() * 360);
   return { x: spot.x, y: spot.y, rot };
+}
+
+export const STACK_CHANCE = 0.25;
+
+export function placeHandfulCoin(pile, coin, rng = Math.random) {
+  const same = pile.filter((e) => e.coinId === coin.id);
+  if (same.length > 0 && rng() < STACK_CHANCE) {
+    const target = same[Math.floor(rng() * same.length)];
+    return { x: target.x, y: target.y, rot: Math.floor(rng() * 360) };
+  }
+  return placeCoin(pile, coin, rng);
 }
 
 export function pileBox({ x, y }) {
