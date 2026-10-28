@@ -7,11 +7,15 @@ A lightweight, dependency-free web game: match a target amount using UK coins
   Back to stop.
 - **Custom:** type an amount (up to £99.99) and build it with any combination
   of coins.
+- **Cashier:** a customer's coins are on the counter. Add them up and type the
+  total; Check says if it is too high or too low. After a correct answer, Next
+  brings the next customer, and "Customers served" counts them. Counter coins
+  can be dragged around but not added or removed. Difficulty applies here too.
 - **Difficulty:** Easy always shows each coin's value. Normal hides it; hover,
   hold or focus a coin for 2 seconds to read it.
 
-Tap a coin in the tray to add it, tap a coin in your pile to remove it. Coins
-in the pile can be dragged (or moved one at a time with the arrow keys), and
+In Endless and Custom, tap a coin in the tray to add it, tap a coin in your
+pile to remove it. Coins in the pile can be dragged (or moved one at a time with the arrow keys), and
 coins can also be dragged from the tray to a spot in the pile. Same coins that
 touch stack, and a stack shows its count (×2, ×3, ...); different coins push
 apart. Dragging a stack moves it together; hold a coin for 1 second to take it
