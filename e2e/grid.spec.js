@@ -33,12 +33,12 @@ for (const vw of [320, 1280]) {
   });
 }
 
-test("one 1 cm scale note shows under the pile heading in Endless and in Cashier", async ({ page }) => {
+test("one hint note shows under the pile heading in Endless and in Cashier", async ({ page }) => {
   await startMode(page, "Endless");
   const notes = page.locator(".scale-note");
   await expect(notes).toHaveCount(1);
   await expect(notes).toBeVisible();
-  await expect(notes).toHaveText("1 square = 1 cm on a real coin");
+  await expect(notes).toHaveText("you can drag the coin around and stack them");
   await page.locator("#btn-back").click();
   await page.getByRole("button", { name: "Cashier", exact: true }).click();
   await expect(page.locator(".pile-area .scale-note")).toBeVisible();

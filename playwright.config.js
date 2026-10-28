@@ -16,7 +16,11 @@ export default defineConfig({
     baseURL: "http://localhost:4173",
     trace: "retain-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  // WebKit (iOS Safari's engine) only runs the *.webkit.spec.js files: the rest of the suite relies on Chromium's JS coverage.
+  projects: [
+    { name: "chromium", testIgnore: /\.webkit\.spec\.js$/, use: { ...devices["Desktop Chrome"] } },
+    { name: "webkit", testMatch: /\.webkit\.spec\.js$/, use: { ...devices["iPhone 14"] } },
+  ],
   webServer: {
     command: "node e2e/serve.js",
     url: "http://localhost:4173",
