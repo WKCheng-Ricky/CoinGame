@@ -124,7 +124,14 @@ integer number of milliseconds from 0 to 10000 (0 changes how the game plays:
 
 ## Deploy
 
-Any static host works, e.g. GitHub Pages.
+The game is live at https://wkcheng-ricky.github.io/CoinGame/.
+
+Every push to `main` runs CI. If the `unit` and `e2e` jobs pass, the `deploy` job
+publishes `index.html`, `styles.css`, `theme-boot.js`, `src/` and `fonts/` to
+GitHub Pages. Pull requests run CI but never deploy.
+
+One-time setup: in the repository settings, set Pages > Source to "GitHub Actions".
+Any other static host also works, since there is no build step.
 
 ## Layout
 
