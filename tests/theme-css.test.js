@@ -48,6 +48,25 @@ test("every themed variable has a plain light fallback before the @supports bloc
   }
 });
 
+test("--lift-shadow and --grid-major are themed (the fallback test above checks their plain values)", () => {
+  for (const name of ["--lift-shadow", "--grid-major"]) {
+    assert.ok(pairs.some(([n]) => n === name), `${name} has no light-dark() pair`);
+    const plain = css.slice(0, supports.from).match(new RegExp(`${name}:\\s*([^;]+);`));
+    assert.ok(plain && !plain[1].includes("light-dark"), `${name} has no plain fallback`);
+  }
+});
+
+test("the lift shadows use --lift-shadow and no hard-coded #0005 drop-shadow remains", () => {
+  assert.ok(!css.includes("#0005"));
+  assert.equal([...css.matchAll(/drop-shadow\(0 3px 4px var\(--lift-shadow\)\)/g)].length, 3);
+});
+
+test("main pads its sides with the safe-area insets", () => {
+  const rule = /(?:^|\n)main\s*\{([^}]*)\}/.exec(css);
+  assert.ok(rule, "main rule");
+  assert.match(rule[1], /padding-inline:\s*max\(1rem,\s*env\(safe-area-inset-left\)\)\s+max\(1rem,\s*env\(safe-area-inset-right\)\)/);
+});
+
 test("browsers without light-dark() hide the theme icon button", () => {
   const i = css.indexOf("@supports not (color: light-dark(#000, #fff))");
   assert.ok(i !== -1);

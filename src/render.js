@@ -1,14 +1,69 @@
 import { COINS } from "./coins.js";
-import { arcLetters, polygonPoints, reuleauxPath } from "./shapes.js";
+import { arcLetters, polygonPoints, reuleauxPath, shapeRadiusAt } from "./shapes.js";
 import { PILE_HEIGHT_MM, PILE_MARGIN_MM, PILE_WIDTH_MM, pileBox, stackCounts } from "./game.js";
 
 
-// Layout of one face, in viewBox units (a round coin's body is 92 wide, its rim line 78 wide).
+// Layout of one face, in viewBox units (a round coin's body is 92 wide, its rim line at most 78 wide).
 const BODY_WIDTH = 92;
-const RIM_WIDTH = 78;
-const WORD_RADIUS = 40.6; // baseline radius of the wording, just outside the rim line
-const WORD_SIZE = 4.6;
+const BODY_STROKE = 3;
+const MAX_RIM_WIDTH = 78;
+const MIN_RIM_WIDTH = 74; // the rim may move in this far to widen the wording band
+const RIM_STROKE = 1;
+const MIN_WORD_SIZE = 3.5;
+const MAX_WORD_SIZE = 4.6;
+const GOOD_WORD_SIZE = 4.2; // stop narrowing the rim once the wording is at least this big
+const CLEARANCE = 0.6; // wanted gap to both lines (the tests require 0.5)
+const CAP_HEIGHT = 0.72; // capital height as a fraction of the font size
+const GLYPH_HALF_WIDTH = 0.4; // half a letter's width as a fraction of the font size
 const SHINE_RADIUS = 35;
+
+const deg = (rad) => (rad * 180) / Math.PI;
+
+// How far the letters at baseline radius `radius` clear the rim (inner) and body (outer) lines.
+function wordClearance(coin, rimWidth, radius, size) {
+  const cap = CAP_HEIGHT * size, half = GLYPH_HALF_WIDTH * size;
+  let inner = Infinity, outer = Infinity;
+  for (const { angle } of arcLetters(coin.wording, radius, size)) {
+    for (const x of [-half, 0, half]) {
+      const rim = shapeRadiusAt(coin.shape, rimWidth, angle + deg(Math.atan2(x, radius))) + RIM_STROKE / 2;
+      const body = shapeRadiusAt(coin.shape, BODY_WIDTH, angle + deg(Math.atan2(x, radius + cap))) - BODY_STROKE / 2;
+      inner = Math.min(inner, Math.hypot(radius, x) - rim);
+      outer = Math.min(outer, body - Math.hypot(radius + cap, x));
+    }
+  }
+  return Math.min(inner, outer);
+}
+
+// Largest size (down to MIN_WORD_SIZE) that fits at this rim width, with the baseline radius
+// in the middle of the radii that fit so the gap is even on both sides; null if none fits.
+function fitAtRim(coin, rimWidth) {
+  for (let size = MAX_WORD_SIZE; size >= MIN_WORD_SIZE - 1e-9; size -= 0.2) {
+    let first = null, last = null;
+    for (let radius = 36; radius <= 44; radius += 0.2) {
+      if (wordClearance(coin, rimWidth, radius, size) >= CLEARANCE) { first ??= radius; last = radius; }
+    }
+    if (first !== null) return { rimWidth, wordSize: size, wordRadius: (first + last) / 2 };
+  }
+  return null;
+}
+
+// The band between the rim line and the body edge is narrower on the heptagon and 12-gon, so
+// each coin gets its own rim width, wording size and baseline radius: the widest rim that
+// still allows GOOD_WORD_SIZE, or else the rim that allows the largest size.
+const layouts = new Map();
+export function faceLayout(coin) {
+  if (layouts.has(coin.id)) return layouts.get(coin.id);
+  let best = null;
+  for (let rim = MAX_RIM_WIDTH; rim >= MIN_RIM_WIDTH; rim -= 0.5) {
+    const fit = fitAtRim(coin, rim);
+    if (fit && (!best || fit.wordSize > best.wordSize + 1e-9)) best = fit;
+    if (best && best.wordSize >= GOOD_WORD_SIZE - 1e-9) break;
+  }
+  // not reachable for the eight UK coins (a test covers them); fall back to the tightest fit
+  best ??= { rimWidth: MIN_RIM_WIDTH, wordSize: MIN_WORD_SIZE, wordRadius: 41 };
+  layouts.set(coin.id, best);
+  return best;
+}
 
 function outlineShape(coin, cls, width, fill, strokeWidth, extra = "") {
   const attrs = `class="${cls}" ${fill ? `fill="${fill}"` : 'fill="none"'} stroke-width="${strokeWidth}"${extra}`;
@@ -17,30 +72,36 @@ function outlineShape(coin, cls, width, fill, strokeWidth, extra = "") {
   return `<circle ${attrs} cx="50" cy="50" r="${width / 2}"/>`;
 }
 
-function shineArc() {
-  const point = (deg) => {
-    const a = ((deg - 90) * Math.PI) / 180;
-    return `${(50 + SHINE_RADIUS * Math.cos(a)).toFixed(2)},${(50 + SHINE_RADIUS * Math.sin(a)).toFixed(2)}`;
+function shineArc(radius) {
+  const point = (angle) => {
+    const a = ((angle - 90) * Math.PI) / 180;
+    return `${(50 + radius * Math.cos(a)).toFixed(2)},${(50 + radius * Math.sin(a)).toFixed(2)}`;
   };
-  return `M${point(-75)} A${SHINE_RADIUS},${SHINE_RADIUS} 0 0 1 ${point(-30)}`;
+  return `M${point(-75)} A${radius},${radius} 0 0 1 ${point(-30)}`;
 }
 
-function wordingLetters(coin) {
-  return arcLetters(coin.wording, WORD_RADIUS, WORD_SIZE).map(({ char, angle }) =>
-    `<text class="coin-word" x="50" y="${(50 - WORD_RADIUS).toFixed(2)}" text-anchor="middle" transform="rotate(${angle.toFixed(2)} 50 50)" font-family="system-ui, sans-serif" font-weight="700" font-size="${WORD_SIZE}" fill="#222">${char}</text>`).join("");
+function wordingLetters(coin, { wordRadius, wordSize }) {
+  return arcLetters(coin.wording, wordRadius, wordSize).map(({ char, angle }) =>
+    `<text class="coin-word" x="50" y="${(50 - wordRadius).toFixed(2)}" text-anchor="middle" transform="rotate(${angle.toFixed(2)} 50 50)" font-family="system-ui, sans-serif" font-weight="700" font-size="${wordSize.toFixed(1)}" fill="#222">${char}</text>`).join("");
 }
 
 // Layers, outside in: body, rim line, shine, inner disc (two-metal coins), wording, numeral.
 export function coinSvg(coin) {
-  const body = outlineShape(coin, "coin-body coin-edge", BODY_WIDTH, coin.fill, 3);
-  const rim = outlineShape(coin, "coin-rim", RIM_WIDTH, null, 1, ` stroke="${coin.shade.dark}"`);
-  const shine = `<path class="coin-shine" d="${shineArc()}" fill="none" stroke="${coin.shade.light}" stroke-width="2.5" stroke-linecap="round" opacity="0.9"/>`;
+  const layout = faceLayout(coin);
+  const body = outlineShape(coin, "coin-body coin-edge", BODY_WIDTH, coin.fill, BODY_STROKE);
+  const rim = outlineShape(coin, "coin-rim", layout.rimWidth, null, RIM_STROKE, ` stroke="${coin.shade.dark}"`);
+  // keep the highlight inside a rim that moved in
+  let shineRadius = SHINE_RADIUS;
+  for (let angle = -75; angle <= -30; angle += 5) {
+    shineRadius = Math.min(shineRadius, shapeRadiusAt(coin.shape, layout.rimWidth, angle) - 2.5);
+  }
+  const shine = `<path class="coin-shine" d="${shineArc(shineRadius)}" fill="none" stroke="${coin.shade.light}" stroke-width="2.5" stroke-linecap="round" opacity="0.9"/>`;
   const disc = coin.ring
     ? `<circle class="coin-disc coin-edge" cx="50" cy="50" r="31" fill="${coin.ring}" stroke-width="2"/>`
     : "";
   const size = coin.label.length > 2 ? 28 : 34;
   const label = `<text class="coin-label" x="50" y="50" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif" font-weight="700" font-size="${size}" fill="#222">${coin.label}</text>`;
-  return `<svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">${body}${rim}${shine}${disc}${wordingLetters(coin)}${label}</svg>`;
+  return `<svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">${body}${rim}${shine}${disc}${wordingLetters(coin, layout)}${label}</svg>`;
 }
 
 function placeCoin(btn, entry) {

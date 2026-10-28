@@ -19,16 +19,22 @@
       </button>
       <h1 tabindex="-1">Coin Game</h1>
       <p>Make the amount using UK coins.</p>
-      <fieldset class="difficulty">
+      <fieldset class="choice difficulty">
         <legend>Difficulty</legend>
-        <label><input type="radio" name="difficulty" id="diff-normal" value="normal" checked autocomplete="off"> Normal: read the coins yourself</label>
-        <label><input type="radio" name="difficulty" id="diff-easy" value="easy" autocomplete="off"> Easy: values always shown</label>
+        <label title="Read the coins yourself" aria-describedby="diff-normal-help"><input type="radio" name="difficulty" id="diff-normal" value="normal" checked autocomplete="off" aria-describedby="diff-normal-help"> Normal</label>
+        <label title="Values always shown" aria-describedby="diff-easy-help"><input type="radio" name="difficulty" id="diff-easy" value="easy" autocomplete="off" aria-describedby="diff-easy-help"> Easy</label>
+        <span class="sr-only" id="diff-normal-help">Read the coins yourself</span>
+        <span class="sr-only" id="diff-easy-help">Values always shown</span>
       </fieldset>
-      <div class="stack-col">
-        <button id="btn-endless" class="primary">Endless</button>
-        <button id="btn-custom">Custom</button>
-        <button id="btn-cashier">Cashier</button>
-      </div>
+      <p id="difficulty-note" class="choice-note" aria-live="polite"></p>
+      <fieldset class="choice">
+        <legend>Choose a game</legend>
+        <div class="stack-col">
+          <button id="btn-endless" class="primary">Endless</button>
+          <button id="btn-custom">Custom</button>
+          <button id="btn-cashier">Cashier</button>
+        </div>
+      </fieldset>
     </section>
 
     <section id="screen-custom" hidden>
@@ -44,7 +50,7 @@
       </form>
     </section>
 
-    <section id="screen-play" hidden>
+    <section id="screen-play" data-difficulty="normal" hidden>
       <header class="topbar">
         <button id="btn-back">&lsaquo; Back</button>
         <div class="topbar-info">
@@ -52,7 +58,7 @@
           <p id="play-rounds" class="rounds" hidden></p>
         </div>
       </header>
-      <div class="board" data-difficulty="normal">
+      <div class="board">
         <div class="pile-area">
           <h2 id="pile-heading">Your coins</h2>
           <p class="scale-note">1 square = 1 cm on a real coin</p>
@@ -60,24 +66,22 @@
           <p id="play-pile-summary" class="sr-only"></p>
           <p id="play-total" class="total" aria-live="polite"></p>
         </div>
-        <div class="tray-area">
-          <h2>Add a coin</h2>
-          <p class="scale-note">1 square = 1 cm on a real coin</p>
-          <div id="play-tray" class="tray"></div>
-        </div>
       </div>
       <div id="cashier-answer" class="cashier-answer" hidden>
         <label for="cashier-input">Total on the counter (£)</label>
         <input id="cashier-input" type="text" inputmode="decimal" autocomplete="off" aria-describedby="cashier-error" placeholder="3.95">
         <p id="cashier-error" class="error" role="alert"></p>
       </div>
-      <p id="play-message" class="message" aria-live="polite"></p>
-      <div class="row actions">
-        <button id="btn-check" class="primary">Check</button>
-        <button id="btn-clear">Clear</button>
-        <button id="btn-next" class="primary" hidden>Next</button>
-        <button id="btn-again" class="primary" hidden>Play again</button>
-        <button id="btn-change" hidden>Change amount</button>
+      <div class="dock">
+        <p id="play-message" class="message" aria-live="polite"></p>
+        <div id="play-tray" class="tray" role="group" aria-label="Add a coin"></div>
+        <div class="row actions">
+          <button id="btn-check" class="primary" aria-keyshortcuts="Enter" title="Check (Enter)">Check</button>
+          <button id="btn-clear">Clear</button>
+          <button id="btn-next" class="primary" hidden>Next</button>
+          <button id="btn-again" class="primary" hidden>Play again</button>
+          <button id="btn-change" hidden>Change amount</button>
+        </div>
       </div>
     </section>
   </main>

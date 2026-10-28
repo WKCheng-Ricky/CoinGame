@@ -223,6 +223,174 @@ on real phones.
 - **Not done.** No theme control on game screens, no high-contrast or other
   themes, no syncing between devices.
 
+## 6. Round 2: menu, difficulty, tray in the bar, Enter to check, review fixes
+
+Added after the first implementation was reviewed and tried. Where this section
+conflicts with sections 1, 2 or 5, this section wins: the tray moves into the
+bottom bar, the theme control is the icon button of section 5, and the target
+size is the one stated in 6.7. Everything else in sections 1 to 5 stands.
+
+### 6.1 Game mode box (Home)
+
+- A bordered box with the legend "Choose a game", built like the Difficulty box
+  (`<fieldset class="choice">`), holds the three mode buttons `#btn-endless`,
+  `#btn-custom` and `#btn-cashier`. They stay buttons that start the game on one
+  tap (no select-then-Start step); ids and behaviour are unchanged. The
+  fieldset only groups them and gives them a visible label.
+- Home order: title and line of text, Difficulty box, "Choose a game" box. The
+  theme icon stays at the top-right.
+
+### 6.2 Difficulty labels
+
+- The two radios are labelled just "Normal" and "Easy" (nothing wraps).
+- Their explanations ("Read the coins yourself" and "Values always shown") are
+  shown three ways:
+  - a `title` tooltip on each label, for mouse users;
+  - an `aria-describedby` target with the same text, for screen readers;
+  - hold to reveal, for touch and keyboard: hovering, focusing or pressing and
+    holding a label for the dwell time (`timing.dwellMs`, so the existing
+    `?dwell=` query parameter shortens it) shows the explanation in a one-line
+    note under the box (`<p id="difficulty-note" class="choice-note">`,
+    `aria-live="polite"`); leaving, blurring or releasing hides it. A press
+    that reveals the note does not change the selection (the click that
+    follows is ignored, as the coin code does), so a player can read an option
+    without choosing it.
+
+### 6.3 Tray in the sticky bottom bar (Endless and Custom)
+
+- The sticky bottom card becomes `<div class="dock">`, containing, in order: the
+  result message `#play-message`, the tray `#play-tray`, and the existing
+  `.actions` row (Check, Clear, Next, Play again, Change amount). Only `.dock`
+  is sticky; `.actions` is a plain row inside it.
+- The board holds only the pile area, centred (max about 28rem on wide
+  screens), in all modes. The tray's "Add a coin" heading and its second scale
+  note are removed; `#play-tray` gets `role="group"` and `aria-label="Add a
+  coin"`, and the one scale note stays under the pile heading (both grids use the
+  same square).
+- **Phones (under 48rem):** tray as two rows of four, then the buttons centred
+  below. **Wide screens:** the tray as one row of eight at full scale, and the
+  buttons to its right, in one row.
+- **Cashier:** no tray (hidden as today), so the dock holds the message and the
+  buttons. The Cashier answer field stays in the page flow.
+- **The result message moves into the dock** so "Too high", "Too low" and the
+  success text are always on screen when Check is pressed. Before this change the
+  message sat in the page flow above the bar and could be scrolled out of
+  view on a short phone.
+- **Height cost (be aware):** on a phone the dock is about 200 to 230 px tall
+  (message line, two coin rows, buttons). With the top bar the board gets about
+  370 px on a 375x667 phone, so on that size the pile may need a small scroll;
+  on 360x800 and 393x852 the whole pile fits without scrolling. Dragging a coin
+  from the tray to the pile works while both are on screen, because the drag
+  ghost is `position: fixed`.
+- **Tray box:** the tray is a box like the pile: `2px dashed var(--line)`, the
+  same radius, `--pile-bg` background, a small inner padding so coins do not
+  touch the edge, and the 1 cm grid filling the whole box edge to edge (the
+  grid is drawn on the tray box itself, not a smaller inner area, so it is no
+  longer cut off). The scale arithmetic of section 2 is unchanged.
+
+### 6.4 Running total hidden in Normal
+
+- `#play-total` ("Your total: ...") is shown only in Easy and hidden in Normal,
+  as it already is in Cashier. In Normal, adding a coin and watching the total
+  jump gave away its hidden value, which defeated the point of counting.
+- Unchanged: the "Too high / Too low" hints after Check, the stack badge (a
+  count, not a value), and the screen-reader-only list of coin types
+  (`#play-pile-summary`), which earlier specs accept as a visual-only
+  challenge.
+- This changes the first spec's "Running total, always visible": it is now
+  visible in Easy only.
+
+### 6.5 Enter to Check
+
+- On the play screen (Endless, Custom and Cashier), pressing Enter runs the same
+  action as the Check button, when the round is not solved.
+- **Plain Enter** works when focus is not on a button, input, link or other
+  control that uses Enter itself. A focused coin keeps its meaning (Enter
+  removes it from the pile or adds it from the tray) and a focused Clear keeps
+  clearing. The Cashier amount field already checks on Enter and keeps doing so.
+- **Ctrl+Enter** (or Cmd+Enter on a Mac) works from anywhere on the play
+  screen, including while a coin or button has focus.
+- It ignores held-down key repeat (one Check per press), does nothing on Home or
+  the Custom amount form, and does nothing once the round is solved. After a
+  correct answer Enter does not press Next or Play again.
+- The Check button gets `aria-keyshortcuts="Enter"` and the tooltip "Check
+  (Enter)".
+
+### 6.6 Review fixes
+
+From the whole-branch review of the first implementation.
+
+- **Dark-mode lift shadow (important).** The drag, held-coin and tray-ghost
+  shadows use a new themed `--lift-shadow` (a plain light value in `:root`, a
+  `light-dark()` pair in the `@supports` block, with a dark value that is
+  visible on the dark pile, such as a stronger shadow or a faint light glow). It
+  replaces the three hard-coded `#0005` drop-shadows.
+- **Landscape safe-area (important).** `main` uses `padding-inline:
+  max(1rem, env(safe-area-inset-left)) max(1rem, env(safe-area-inset-right))`,
+  so Back, the pile and Home clear a camera cut-out in landscape. Chromium
+  cannot emulate insets, so a test checks the declaration in the stylesheet, and
+  it needs one manual check on a real phone.
+- **Wording clear of the edge lines.** On the 20p, 50p and £1 the letters touch
+  the edge line (the Reuleaux sides and the 12-gon flats are closer to the
+  centre than the round coins' rim), and on the 20p and 50p the top letters
+  nearly touch the inner rim line. The word radius is derived from each body's
+  minimum radius, the font is sized to fit, and the inner rim may be inset a
+  little more (down to a width of 74 units) to widen the band, so that every
+  letter clears both lines by at least 0.5 units on all eight coins. A unit test
+  computes each coin's letter extents against the band.
+- **Grid major lines in light.** A new themed `--grid-major` variable gives
+  every fifth line its own stronger colour in both themes; in light the major
+  lines were the same opaque colour as the minor ones.
+- **Test fixes:** the contrast test asserts a visible outline (style not none,
+  width at least 2 px) as well as its colour; its dead `slice(cond ? 0 : 0)` is
+  removed; the "heading still visible after scrolling" phone test also asserts
+  that the page actually scrolled (`scrollY > 0`) on screens where it can.
+- **`theme-boot.js`** wraps its code in a block or function so it creates no
+  global variables.
+
+### 6.7 Spec corrections to match what was built
+
+- The top-bar target is `clamp(1.2rem, 5vw, 1.75rem)`, not a fixed "about
+  1.75rem": it reaches 1.75rem above about 560 px and is about 1.2rem on phones,
+  so the Cashier heading fits on one line.
+- The light-theme coin edge is `#00000080` (was `#00000055`), because the old
+  value measured 2.3:1 against the pile and 3:1 is the target; the dark-theme
+  grid line is `#ffffff1a`.
+
+### 6.8 Out of scope
+
+Select-then-Start for modes, a persisted difficulty, Enter to advance after a
+correct answer, a collapsible tray, and any change to coin art or game rules.
+
+### 6.9 Testing
+
+- **e2e, Home:** the "Choose a game" fieldset contains the three mode buttons
+  and each still starts its mode on one click; the difficulty labels read
+  "Normal" and "Easy" with no wrapping at 320 px; the `title` and
+  `aria-describedby` text is present; holding or hovering a label for the dwell
+  time shows the note, and a held press does not change the selection.
+- **e2e, play screen:** in Normal `#play-total` is hidden and in Easy it is
+  visible (and still hidden in Cashier); in Endless and Custom `#play-tray` is
+  inside `.dock`, and the dock, tray, Check and Clear are fully in the viewport
+  at 375x667, 360x800 and 393x852; the pile is fully visible at 360x800 and
+  393x852; after a wrong Check the message is inside the dock and in the
+  viewport; dragging a tray coin onto the pile and tapping one both still work
+  from the dock; the tray box has the dashed border and its grid covers its
+  full width and height (computed background size and box size); Cashier shows
+  no tray.
+- **e2e, Enter:** Enter with focus on the page or the heading runs Check;
+  Enter on a focused coin removes it and on Clear clears; Ctrl+Enter runs Check
+  from a focused coin; a held key (repeated keydown) checks once; nothing on
+  Home or Custom; nothing once solved.
+- **Review fixes:** a stylesheet test finds `--lift-shadow` and `--grid-major`
+  with plain fallbacks and the `padding-inline` safe-area declaration and no
+  `#0005` drop-shadow; the unit test of letter extents above; the contrast and
+  phone test changes; a jsdom test that `theme-boot.js` leaves no global
+  variables.
+- Existing e2e tests that use `.tray-area`, "Add a coin", `.actions` as the
+  sticky bar, `.board` columns or a visible total in Normal are updated to the
+  new structure; the coverage gates still apply.
+
 ## Testing
 
 - **jsdom, `theme.js`:** `readTheme` returns `"light"`, `"dark"` or `"auto"`

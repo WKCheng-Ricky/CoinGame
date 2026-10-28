@@ -6,7 +6,7 @@ const MEASURE = () => {
   const parse = (css) => {
     const nums = css.match(/-?[\d.]+(?:e-?\d+)?/g).map(Number);
     if (css.startsWith("color(")) {
-      const [r, g, b, a = 1] = nums.slice(nums[0] === 0 && css.includes("srgb") && nums.length > 4 ? 0 : 0);
+      const [r, g, b, a = 1] = nums;
       return [r * 255, g * 255, b * 255, a];
     }
     const [r, g, b, a = 1] = nums;
@@ -62,6 +62,8 @@ const MEASURE = () => {
     },
     focus(el, label) {
       const around = background(el, false);
+      const cs = getComputedStyle(el);
+      out.push({ label: `${label} (outline shown)`, kind: "outline", style: cs.outlineStyle, width: parseFloat(cs.outlineWidth) });
       out.push({ label, kind: "border", ratio: ratio(over(parse(getComputedStyle(el).outlineColor), around), around) });
     },
     coinEdge(coinId) {
@@ -81,7 +83,10 @@ async function measure(page, fn) {
 
 function assertAll(results) {
   expect(results.length).toBeGreaterThan(0);
-  const bad = results.filter((r) => r.ratio < (r.kind === "text" ? 4.5 : 3));
+  // a focus ring must really be drawn: a visible style and at least 2px
+  const hidden = results.filter((r) => r.kind === "outline" && (r.style === "none" || !(r.width >= 2)));
+  expect(hidden, `focus outline not visible: ${JSON.stringify(hidden)}`).toEqual([]);
+  const bad = results.filter((r) => r.kind !== "outline" && r.ratio < (r.kind === "text" ? 4.5 : 3));
   expect(bad, `low contrast: ${JSON.stringify(bad)}`).toEqual([]);
 }
 

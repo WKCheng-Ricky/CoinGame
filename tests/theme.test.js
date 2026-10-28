@@ -81,6 +81,15 @@ test("boot script does not throw when localStorage throws", () => {
   assert.equal(theme, undefined);
 });
 
+test("boot script creates no global variables", () => {
+  const dom = new JSDOM("<!doctype html><html></html>", { url: "http://localhost/", runScripts: "outside-only" });
+  const before = new Set(Object.getOwnPropertyNames(dom.window));
+  dom.window.localStorage.setItem(THEME_KEY, "dark");
+  dom.window.eval(bootSource);
+  const added = Object.getOwnPropertyNames(dom.window).filter((k) => !before.has(k));
+  assert.deepEqual(added, []);
+});
+
 test("boot script uses the same key as theme.js", () => {
   assert.ok(bootSource.includes(THEME_KEY));
 });

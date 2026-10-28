@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { arcLetters, polygonPoints, reuleauxPath } from "../src/shapes.js";
+import { arcLetters, polygonPoints, reuleauxPath, shapeRadiusAt } from "../src/shapes.js";
 
 const WIDTH = 92;
 const R = WIDTH / 2 / Math.cos(Math.PI / 14);
@@ -67,4 +67,32 @@ test("arcLetters spreads letters symmetrically with a wider gap at spaces", () =
 
 test("polygonPoints gives one pair per side", () => {
   assert.equal(polygonPoints(12, 46).split(" ").length, 12);
+});
+
+test("shapeRadiusAt is the radius everywhere on a circle", () => {
+  for (const angle of [0, 17, 90, 200, 359]) assert.ok(Math.abs(shapeRadiusAt("round", 92, angle) - 46) < 1e-9);
+});
+
+test("shapeRadiusAt on a width-92 Reuleaux heptagon: vertex radius at a vertex, shortest at mid-arc", () => {
+  assert.ok(Math.abs(shapeRadiusAt("heptagon", 92, 0) - 47.18) < 0.01);
+  assert.ok(Math.abs(shapeRadiusAt("heptagon", 92, 360 / 7) - 47.18) < 0.01);
+  assert.ok(Math.abs(shapeRadiusAt("heptagon", 92, 180 / 7) - 44.82) < 0.01);
+  assert.ok(Math.abs(shapeRadiusAt("heptagon", 92, -180 / 7) - 44.82) < 0.01);
+  assert.ok(Math.abs(shapeRadiusAt(7, 92, 400) - shapeRadiusAt("heptagon", 92, 40)) < 1e-9);
+});
+
+test("shapeRadiusAt on a 12-gon of width 92: 46 at a vertex, about 44.43 at a flat", () => {
+  assert.ok(Math.abs(shapeRadiusAt("dodecagon", 92, 0) - 46) < 1e-9);
+  assert.ok(Math.abs(shapeRadiusAt("dodecagon", 92, 15) - 44.43) < 0.01);
+  assert.ok(Math.abs(shapeRadiusAt(12, 92, 45) - 44.43) < 0.01);
+});
+
+test("shapeRadiusAt scales with the width and agrees with the drawn path's vertices", () => {
+  assert.ok(Math.abs(shapeRadiusAt("heptagon", 46, 0) - 47.18 / 2) < 0.01);
+  const { start } = parse(reuleauxPath(7, 92));
+  assert.ok(Math.abs(Math.hypot(start[0] - 50, start[1] - 50) - shapeRadiusAt("heptagon", 92, 0)) < 0.01);
+});
+
+test("shapeRadiusAt rejects an unknown shape", () => {
+  assert.throws(() => shapeRadiusAt("pentagon", 92, 0));
 });

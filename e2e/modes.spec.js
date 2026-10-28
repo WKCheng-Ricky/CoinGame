@@ -40,7 +40,7 @@ test("home shows Endless, Custom and Cashier buttons", async ({ page }) => {
 });
 
 test("custom: building the target and Check shows success, then Play again and Change amount work", async ({ page }) => {
-  await startMode(page, "Custom");
+  await startMode(page, "Custom", { difficulty: "easy" });
   await page.locator("#custom-input").fill("0.30");
   await page.getByRole("button", { name: "Start" }).click();
   await expect(page.locator("#play-target")).toHaveText("£0.30");
@@ -110,7 +110,7 @@ test("endless: a correct pile shows Next and the rounds counter increases", asyn
 });
 
 test("clear empties the pile and back returns to Home", async ({ page }) => {
-  await startMode(page, "Endless");
+  await startMode(page, "Endless", { difficulty: "easy" });
   for (const name of ["Add £1", "Add 50p", "Add 2p"]) {
     await page.getByRole("button", { name, exact: true }).click();
   }
@@ -133,14 +133,14 @@ test("easy shows coin values and normal hides them until hover", async ({ page }
   await page.getByRole("button", { name: "Endless", exact: true }).click();
   await page.getByRole("button", { name: "Add 20p", exact: true }).click();
   const coin = page.locator("#play-pile .pile-coin").first();
-  await expect(page.locator(".board")).toHaveAttribute("data-difficulty", "easy");
+  await expect(page.locator("#screen-play")).toHaveAttribute("data-difficulty", "easy");
   await expect(coin.locator(".coin-label")).toHaveCSS("opacity", "1");
 
   await page.locator("#btn-back").click();
   await page.locator("#diff-normal").check();
   await page.getByRole("button", { name: "Endless", exact: true }).click();
   await page.getByRole("button", { name: "Add 20p", exact: true }).click();
-  await expect(page.locator(".board")).toHaveAttribute("data-difficulty", "normal");
+  await expect(page.locator("#screen-play")).toHaveAttribute("data-difficulty", "normal");
   await expect(coin.locator(".coin-label")).toHaveCSS("opacity", "0");
   await expect(coin).not.toHaveClass(/revealed/);
 

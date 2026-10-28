@@ -147,7 +147,7 @@ test('counter coins cannot be removed and labels are never "Remove ..."', async 
     expect(label).toMatch(coinLabel);
   }
   await expect(page.getByRole("button", { name: /^Remove / })).toHaveCount(0);
-  await expect(page.locator(".tray-area")).toBeHidden();
+  await expect(page.locator("#play-tray")).toBeHidden();
   await expect(page.locator("#btn-clear")).toBeHidden();
 
   // the topmost coin is always clickable; a click must not remove it

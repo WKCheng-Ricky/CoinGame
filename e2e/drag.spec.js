@@ -7,9 +7,10 @@ const pileCoins = (page) => page.locator("#play-pile .pile-coin");
 const badges = (page) => page.locator("#play-pile .stack-badge");
 
 // Open Endless with the given query string (fast timings by default) and a seeded Math.random.
-async function openEndless(page, query = FAST) {
+async function openEndless(page, query = FAST, { difficulty } = {}) {
   await seedRandom(page);
   await page.goto("/?" + query);
+  if (difficulty) await page.locator(`#diff-${difficulty}`).check();
   await page.getByRole("button", { name: "Endless", exact: true }).click();
 }
 
@@ -169,7 +170,7 @@ test("dragging a stack moves the group together", async ({ page }) => {
 });
 
 test("dragging a tray coin onto the pile adds it; dropping it outside does not", async ({ page }) => {
-  await openEndless(page);
+  await openEndless(page, FAST, { difficulty: "easy" });
   const tray50 = page.getByRole("button", { name: "Add 50p", exact: true });
   await drag(page, await centre(tray50), await centre(pile(page)));
 

@@ -9,7 +9,7 @@ async function addCoins(page, ids) {
 test("Normal difficulty hides the numeral but keeps the wording visible", async ({ page }) => {
   await startMode(page, "Endless");
   await addCoins(page, ["20p"]);
-  await expect(page.locator(".board")).toHaveAttribute("data-difficulty", "normal");
+  await expect(page.locator("#screen-play")).toHaveAttribute("data-difficulty", "normal");
   const coin = page.locator("#play-pile .pile-coin").first();
   await expect(coin.locator(".coin-label")).toHaveCSS("opacity", "0");
   const words = coin.locator(".coin-word");

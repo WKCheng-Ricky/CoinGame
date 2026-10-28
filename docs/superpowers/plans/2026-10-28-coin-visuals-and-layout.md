@@ -239,3 +239,109 @@ The spec's section 5 "Choice" changed after Tasks 1-7 were built: the Theme fiel
 - [ ] **Step 4:** Run `npm run test:coverage` and `npm run test:e2e:coverage`. Expected: both exit 0, `main.js` at least 80%.
 - [ ] **Step 5: Smoke test the real page by hand (not only the e2e suite).** Serve the repo (`node e2e/serve.js`, wait until `curl` returns 200), open it with the Playwright tools at 1280x720 and 375x667, light and dark, and actually click Endless, Custom (enter 3.95, Start) and Cashier from Home, add a coin, press Back, and press the theme button three times. Take screenshots of Home in light and dark and look at them: the icon must sit cleanly in the top-right corner, not overlap the heading, and the Home content must stay centred. Report anything that fails to respond to a click. Stop any server you start.
 - [ ] **Step 6: Commit** `feat: replace theme radios with a top-right icon button` (explicit paths only; no other branch or history changes).
+
+---
+
+## Round 2 (Tasks 9-13): menu, difficulty, tray in the bar, Enter to Check, review fixes
+
+**Spec:** section 6 of `docs/superpowers/specs/2026-10-28-coin-visuals-and-layout-design.md`. It wins over sections 1, 2 and 5 where they conflict. The Global Constraints above still apply (still no change to `state.js`, `game.js`, `drag.js` or `dwell.js`; no new dependency; both gates must pass). Tasks 9-12 each end with one commit; Task 13 verifies. The Rulings above still apply.
+
+**Review Focus for round 2** (each is pinned by a named test):
+- Moving the tray out of `.board` must not unhide the tray numerals in Normal: the `data-difficulty` and `locked` hooks move to `#screen-play` (Task 10).
+- Enter must not break keyboard activation of coins and buttons (Task 11).
+- The result message must be in the viewport after a wrong Check on a short phone (Task 10).
+- Holding a difficulty label to read its note must not select it (Task 9).
+- Every letter on all eight coins clears the rim line and the body edge by at least 0.5 units, measured at the letter's own angle (Task 12).
+
+### Task 9: Game mode box and short difficulty labels
+
+**Files:**
+- Modify: `index.html`, `styles.css`, `src/main.js`, `e2e/phone.spec.js` (Home centring selectors)
+- Create: `e2e/home.spec.js`
+
+**Interfaces:**
+- Produces: `<fieldset class="choice">` with `<legend>Choose a game</legend>` around `#btn-endless`, `#btn-custom`, `#btn-cashier` (inside `.stack-col`); difficulty labels read "Normal" and "Easy"; `<p id="difficulty-note" class="choice-note" aria-live="polite">`; each difficulty `<label>` has `title` and an `aria-describedby` pointing at a visually hidden `<span class="sr-only" id="diff-normal-help|diff-easy-help">` with "Read the coins yourself" / "Values always shown". The existing `.difficulty` fieldset keeps that class (main.js listens on it) and also gets `choice`.
+
+- [ ] **Step 1: Write failing e2e** `e2e/home.spec.js` (`FAST` timings, `?dwell=50`): the "Choose a game" fieldset contains exactly the three mode buttons and each still opens its mode on one click (Endless shows `#play-target`, Custom shows the amount field, Cashier shows `#cashier-input`); the radio labels' text is exactly "Normal" and "Easy" and neither wraps at 320x640 (label height equals one line); `title` and the described-by text match the two explanations; hovering a label for 50 ms shows its text in `#difficulty-note` and leaving clears it; focusing it by keyboard does the same; a touch press-and-hold (use `page.touchscreen` or a `pointerdown` with `pointerType: "touch"` held 100 ms, then release) shows the note and does NOT change the selected radio, while a quick tap still selects it.
+- [ ] **Step 2:** Run `npx playwright test e2e/home.spec.js`. Expected: FAIL.
+- [ ] **Step 3: Implement.** Markup per Interfaces. In `main.js` add a second `createDwell` (delay `timing.dwellMs`, key = the label element) whose `onReveal` writes the label's help text into `#difficulty-note` and whose `onHide` clears it; wire `pointerover/out`, `focusin/out` and `pointerdown/up/cancel` on the `.difficulty` fieldset (reuse the pattern of `watchDwell`); when a hold revealed the note, swallow the click that follows (`preventDefault` on that label click) so the selection does not change. Styles: `.choice` shares the `.difficulty` rules, `.choice-note` is small and muted with `min-height: 1.4em` so the layout does not jump, `.stack-col` inside the box has no max-width trouble.
+- [ ] **Step 4:** Update `e2e/phone.spec.js` Home centring to measure the new boxes; run `npx playwright test` (all). Expected: pass.
+- [ ] **Step 5: Commit** `feat: group the game modes and shorten the difficulty labels`.
+
+### Task 10: Tray in the sticky dock, message in the dock, total hidden in Normal
+
+**Files:**
+- Modify: `index.html`, `styles.css`, `src/main.js`, and the e2e specs listed in Step 4
+- Create: `e2e/dock.spec.js`
+
+**Interfaces:**
+- Produces: `<div class="dock">` (the only sticky bottom element) containing `#play-message`, `#play-tray` (`role="group" aria-label="Add a coin"`) and the `.actions` row. `data-difficulty`, `locked` and cashier hiding now hang off `#screen-play` (not `.board`). `.board` holds only `.pile-area`. `#play-total` is visible only when `state.difficulty === "easy"` and the mode is not Cashier.
+
+- [ ] **Step 1: Write failing e2e** `e2e/dock.spec.js`:
+  - Normal: `#play-total` hidden after adding a coin; Easy: visible with the running total ("Your total: £0.20"); Cashier: hidden in both.
+  - Normal still hides the tray numerals: `#play-tray .coin-label` computed opacity `0`, and `1` in Easy (this is the regression the selector move could cause).
+  - `#play-tray` is inside `.dock` in Endless and Custom; at 375x667, 360x800 and 393x852 the dock, every tray coin, Check and Clear are fully in the viewport; the pile area is fully visible at 360x800 and 393x852; Cashier has no visible tray and the dock still shows the buttons.
+  - After a wrong Check (Custom 0.05, tap a 1p, Check) `#play-message` is inside `.dock` and in the viewport at 375x667.
+  - Tapping a tray coin adds it, dragging a tray coin onto the pile adds it there, and dragging one outside the pile does not (reuse the helpers in `e2e/drag.spec.js`).
+  - The tray box: computed `border-top-style` is `dashed`, its border radius and background match `.pile`'s, and `getComputedStyle(#play-tray, "::before").backgroundSize` cell width equals the grid test's expectation; the `::before` box equals the tray's padding box (grid covers the full box).
+  - Wide (1280x720): tray coins are on one row (all `top` values within 4 px) and the buttons are to the right of the tray.
+- [ ] **Step 2:** Run it. Expected: FAIL.
+- [ ] **Step 3: `index.html`:** remove `.tray-area` and its heading and scale note; keep one `.scale-note` under the pile heading; wrap `#play-message`, `#play-tray` and the `.actions` row in `<div class="dock">`; move the classes/attributes: `<section id="screen-play" data-difficulty="normal">`.
+- [ ] **Step 4: `src/main.js`:** set `data-difficulty`, the `locked` class and the Cashier layout class on `#screen-play` instead of `.board`; hide the tray with `$("play-tray").hidden = cashier`; set `$("play-total").hidden = cashier || state.difficulty !== "easy"`. Update every existing e2e use: `.board` + `data-difficulty` becomes `#screen-play` (layout, modes, pile, coins specs); `.tray-area` becomes `#play-tray` (cashier, grid); `.pile-area .scale-note` only (grid spec); `.actions` as the sticky bar becomes `.dock` (phone spec); tests that read "Your total: ..." in Normal (modes, drag, pile specs) start in Easy through a `startMode(page, name, { difficulty })` option in `e2e/helpers.js` (check `#diff-easy` before clicking the mode), except where a test is about Normal.
+- [ ] **Step 5: `styles.css`:**
+  - `.dock { position: sticky; bottom: max(0.5rem, env(safe-area-inset-bottom)); margin-top: auto; z-index: 10 }` with the card look the bars have (panel background, border, radius, shadow, padding); remove sticky and card styling from `.actions` (a plain centred flex row); `.dock .message` is a compact one-line status (smaller margins, `min-height` so it does not jump).
+  - Replace every `.board[data-difficulty=...]` and `.board.locked` selector with `#screen-play[data-difficulty=...]` and `#screen-play.locked`; the board is one centred column (about 28rem) in all modes.
+  - Tray as a box: `border: 2px dashed var(--line); border-radius: 0.8rem; background-color: var(--pile-bg); padding: 0.4rem`, grid `::before` with `inset: 0` covering the box and `--cell` unchanged; phones: two rows of four; from 48rem: one row of eight and `.dock` as a flex row (tray left, `.actions` right). Keep `container-type: inline-size` on the tray.
+  - `html { scroll-padding-block: 6rem 14rem; }` (or whatever clears the dock; the Cashier input test must still pass).
+- [ ] **Step 6:** Run `npx playwright test` (all) and `node --test`. Expected: pass. Fix specs, not the game, if a sticky bar covers a drop target.
+- [ ] **Step 7: Visual check.** Screenshot Endless and Cashier at 375x667, 360x800, 393x852 and 1280x720 in light and dark; check the tray box, the grid edges, the message line and that nothing overlaps.
+- [ ] **Step 8: Commit** `feat: move the coin tray into the sticky bar and hide the total in Normal`.
+
+### Task 11: Enter to Check
+
+**Files:**
+- Create: `src/keys.js`, `tests/keys.test.js`, `e2e/enter.spec.js`
+- Modify: `src/main.js`, `index.html`
+
+**Interfaces:**
+- Produces: `isCheckShortcut(event) -> boolean` in `src/keys.js`; `event` has `key`, `ctrlKey`, `metaKey`, `repeat`, `target`. True when `key === "Enter"`, not `repeat`, and either `ctrlKey`/`metaKey` is set, or the target is not an interactive control (`button`, `input`, `select`, `textarea`, `a[href]`, `summary`, `[contenteditable]`). `#play-heading` (tabindex -1) and `body` are not interactive.
+
+- [ ] **Step 1: Write failing tests.** `tests/keys.test.js` (jsdom elements): Enter on `body` and on a heading true; on a `button` and an `input` false; Ctrl+Enter and Meta+Enter on a button true; `repeat: true` false; other keys false; Shift+Enter on body true (not a shortcut modifier). `e2e/enter.spec.js`: with focus on `#play-heading`, Enter runs Check (Custom 0.01 with a 1p: success message); Enter on a focused pile coin removes it and does not Check; Enter on Clear clears; Ctrl+Enter from a focused pile coin runs Check; `page.keyboard.down("Enter")` repeated (hold) checks once (Custom 0.05 with a 1p: the hint is announced once, assert the message object changed once via a counter on the `#play-message` text updates or `MutationObserver`); nothing on Home or the Custom form (Enter there still only submits the form); nothing after the round is solved (message unchanged); Cashier: Enter on the page with a typed amount checks it; the Check button has `aria-keyshortcuts="Enter"` and `title="Check (Enter)"`.
+- [ ] **Step 2:** Run `node --test tests/keys.test.js` and `npx playwright test e2e/enter.spec.js`. Expected: FAIL.
+- [ ] **Step 3: Implement** `isCheckShortcut`; in `main.js` add one `document` `keydown` listener: if `#screen-play` is visible and `isCheckShortcut(e)` and not solved, `preventDefault()` and run the same function the Check button's click handler runs (extract it to a named function used by both). `index.html`: Check gets `aria-keyshortcuts="Enter"` and `title="Check (Enter)"`.
+- [ ] **Step 4:** Run `npm run test:coverage` and the e2e spec. Expected: pass; `keys.js` meets the 80% gates.
+- [ ] **Step 5: Commit** `feat: press Enter to Check`.
+
+### Task 12: Review fixes
+
+**Files:**
+- Modify: `styles.css`, `theme-boot.js`, `src/render.js`, `src/shapes.js`, `tests/shapes.test.js`, `tests/render.test.js`, `tests/theme.test.js`, `tests/theme-css.test.js`, `e2e/contrast.spec.js`, `e2e/phone.spec.js`
+
+**Interfaces:**
+- Produces: CSS variables `--lift-shadow` and `--grid-major` (plain light value in `:root`, `light-dark()` pair in the `@supports` block, like the others, so the existing fallback test covers them); `shapeRadiusAt(sides|kind, width, angleDeg) -> number` in `src/shapes.js` (distance from the centre to the outline of a circle, a Reuleaux heptagon or a 12-gon of the given width, at an angle from the top).
+
+- [ ] **Step 1: Write failing tests.**
+  - `tests/theme-css.test.js`: `--lift-shadow` and `--grid-major` each have a plain fallback and a `light-dark()` pair; no `drop-shadow(0 3px 4px #0005)` remains (the three drop-shadows use `var(--lift-shadow)`); `main` has `padding-inline` using `env(safe-area-inset-left)` and `env(safe-area-inset-right)`.
+  - `tests/theme.test.js`: running `theme-boot.js` in jsdom adds no new keys to `window` (compare `Object.keys(window)` before and after).
+  - `tests/shapes.test.js`: `shapeRadiusAt` equals the radius for a circle, and for a width-92 Reuleaux heptagon is about 47.18 at a vertex angle and 44.82 at a mid-arc angle; for a 12-gon is 46 at a vertex and about 44.43 at a flat.
+  - `tests/render.test.js`: for each coin, every wording letter's extent (baseline radius to baseline + cap height, with cap height 0.72 of the font size, and its angular half-width) clears the rim line outer edge (rim outline plus half its stroke) and the body's inner stroke edge by at least 0.5 units, using `shapeRadiusAt` at the letter's own angle.
+  - `e2e/contrast.spec.js`: the focus checks also assert `outlineStyle !== "none"` and `outlineWidth >= 2px`; remove the dead `slice(cond ? 0 : 0)`.
+  - `e2e/phone.spec.js`: the "heading still visible after scrolling" test asserts `scrollY > 0` first on the screens where the page is taller than the viewport.
+- [ ] **Step 2:** Run `node --test` and the touched e2e specs. Expected: FAIL.
+- [ ] **Step 3: Implement.**
+  - `styles.css`: add the two variables and use them (all three lift shadows; the fifth grid lines use `--grid-major`; choose a darker stripe in light and a lighter one in dark so major lines read in both). Add `main { padding-inline: max(1rem, env(safe-area-inset-left)) max(1rem, env(safe-area-inset-right)); }` keeping the existing vertical padding.
+  - `src/render.js`: derive the wording radius and size per coin from the band between the rim line and the body edge: sample `shapeRadiusAt` over the angles the wording spans; inset the rim (`RIM_WIDTH` down to 74 if needed) so a font of at least 3.5 fits with 0.5 units of clearance both sides; set the baseline radius so the letters sit centred in the band. Keep the numerals, disc and shine unchanged and re-check that the inner disc of the £1 and £2 still clears the rim.
+  - `theme-boot.js`: wrap the code in an IIFE.
+- [ ] **Step 4:** Run `npm run test:coverage` and the full e2e. Expected: pass.
+- [ ] **Step 5: Visual check.** Screenshot all eight coins at 300 px in light and dark: lettering clear of both lines and still legible; a dragged coin and a held stack coin show a visible lift in dark.
+- [ ] **Step 6: Commit** `fix: address review findings (dark lift shadow, safe-area padding, wording clearance, grid major lines)`.
+
+### Task 13: Docs and full verification
+
+**Files:**
+- Modify: `README.md`
+
+- [ ] **Step 1: README:** document the "Choose a game" box, the short difficulty labels and hold-to-read notes, the tray in the sticky bar, the total shown only in Easy, Enter and Ctrl+Enter to Check, and the new files (`src/keys.js`) and e2e specs (`home`, `dock`, `enter`) in the Layout list.
+- [ ] **Step 2: Full verification.** `npm run test:coverage` and `npm run test:e2e:coverage` both exit 0, `main.js` at least 80% lines.
+- [ ] **Step 3: Smoke test the real page by hand,** from a plain `python3 -m http.server` (wait until `curl` returns 200) and from `node e2e/serve.js`: at 1280x720 and 375x667, light and dark, click Endless, Custom (3.95, Start) and Cashier from Home; add a coin from the dock; press Enter; press Back; press the theme button three times; read the console for errors after each step. Stop every server you start.
+- [ ] **Step 4: Commit** `docs: describe the round 2 menu, tray and shortcut changes` (explicit paths only).

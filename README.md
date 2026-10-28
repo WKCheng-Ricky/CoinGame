@@ -13,15 +13,30 @@ A lightweight, dependency-free web game: match a target amount using UK coins
   total; Check says if it is too high or too low. After a correct answer, Next
   brings the next customer, and "Customers served" counts them. Counter coins
   can be dragged around but not added or removed. Difficulty applies here too.
-- **Difficulty:** Easy always shows each coin's value. Normal hides it; hover,
-  hold or focus a coin for 2 seconds to read it.
+- **Choose a game:** on Home the three modes sit in a "Choose a game" box; one
+  tap on Endless, Custom or Cashier starts it.
+- **Difficulty:** Easy always shows each coin's value and the running total.
+  Normal hides them; hover, hold or focus a coin for 2 seconds to read its
+  value. The labels are just "Normal" and "Easy"; hover, focus or press and
+  hold one for 2 seconds to read what it means in a note under the box (a hold
+  does not change the choice).
 
 In Endless and Custom, tap a coin in the tray to add it, tap a coin in your
 pile to remove it. Coins in the pile can be dragged (or moved one at a time with the arrow keys), and
 coins can also be dragged from the tray to a spot in the pile. Same coins that
 touch stack, and a stack shows its count (×2, ×3, ...); different coins push
 apart. Dragging a stack moves it together; hold a coin for 1 second to take it
-off the stack, and it stays off when you let go. Press Check when the total matches.
+off the stack, and it stays off when you let go. Press Check when the total matches,
+or press Enter (Ctrl+Enter or Cmd+Enter works even while a coin or button has focus).
+Enter on a focused coin or button keeps its own meaning, and after a correct answer
+it does nothing.
+
+- **Tray in the bar:** on the play screens the message, the coin tray and the
+  buttons sit in a bar that stays at the bottom of the screen, so a wrong Check
+  ("Too high", "Too low") is always visible. On a phone the tray is two rows of
+  four; on a wide screen it is one row with the buttons beside it.
+- **Running total:** "Your total" is shown only in Easy, so in Normal adding a
+  coin does not give its hidden value away.
 
 - **Theme:** Auto (the default) follows the device's light or dark setting. The
   round icon button in the top-right corner of Home cycles Auto, Light, Dark with
@@ -64,7 +79,9 @@ npm run test:e2e:coverage
 - `npx playwright install chromium` is needed once, before the first e2e run.
 - `npm run test:e2e` runs the Playwright browser tests: gameplay and drag specs,
   plus `e2e/theme.spec.js` (the theme button, cycling and saving), `e2e/phone.spec.js`
-  (sticky bars on phone sizes, centred Home), `e2e/coins.spec.js` (coin wording and
+  (sticky bars on phone sizes, centred Home), `e2e/home.spec.js` (the "Choose a game"
+  box and difficulty notes), `e2e/dock.spec.js` (the tray in the bottom bar, the
+  total in Normal and Easy), `e2e/enter.spec.js` (Enter to Check), `e2e/coins.spec.js` (coin wording and
   rotation), `e2e/grid.spec.js` (coin sizes and grid scale) and `e2e/contrast.spec.js`
   (WCAG contrast in both themes).
 - `npm run test:e2e:coverage` also fails if browser coverage of `src/main.js`
@@ -91,6 +108,7 @@ Any static host works, e.g. GitHub Pages.
 - `src/state.js`: pure game state transitions
 - `src/drag.js`: drag geometry and the pile and tray drag controllers
 - `src/dwell.js`: hold-to-reveal timers
+- `src/keys.js`: the Enter / Ctrl+Enter "Check" shortcut test
 - `src/shapes.js`: coin outline geometry (polygons, Reuleaux heptagon, curved lettering)
 - `src/theme.js`: reading, saving, applying and cycling the theme choice
 - `theme-boot.js`: classic script that applies a saved theme before first paint
