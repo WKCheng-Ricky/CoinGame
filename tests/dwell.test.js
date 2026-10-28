@@ -164,3 +164,18 @@ test("prune on an empty dwell is a no-op", () => {
   dwell.prune(() => false);
   assert.deepEqual(calls, []);
 });
+
+test("the default timers use the global setTimeout and clearTimeout", (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const calls = [];
+  const dwell = createDwell({ onReveal: (k) => calls.push(`reveal:${k}`), onHide: (k) => calls.push(`hide:${k}`) });
+  dwell.start("a");
+  t.mock.timers.tick(DWELL_MS - 1);
+  assert.deepEqual(calls, []);
+  t.mock.timers.tick(1);
+  assert.deepEqual(calls, ["reveal:a"]);
+  dwell.start("b");
+  dwell.stop("b");
+  t.mock.timers.tick(DWELL_MS);
+  assert.deepEqual(calls, ["reveal:a"]);
+});

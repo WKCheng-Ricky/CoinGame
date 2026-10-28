@@ -1,5 +1,7 @@
 # Coin Game
 
+![CI](https://github.com/WKCheng-Ricky/CoinGame/actions/workflows/ci.yml/badge.svg)
+
 A lightweight, dependency-free web game: match a target amount using UK coins
 (1p to £2). Works on desktop and mobile.
 
@@ -34,13 +36,36 @@ python3 -m http.server 8000
 
 Then open http://localhost:8000.
 
-## Test
+## Testing
 
 ```
+npm install
 npm test
+npm run test:coverage
+npx playwright install chromium
+npm run test:e2e
+npm run test:e2e:coverage
 ```
 
-Uses Node's built-in test runner (Node 18+). No packages to install.
+- Node 22.22.2 or later is needed for the dev tooling (jsdom, c8, Playwright);
+  the game itself needs nothing.
+- `npm test` runs the unit and jsdom tests with Node's built-in test runner.
+- `npm run test:coverage` adds a per-file 80% gate on lines,
+  branches and functions for `src/` (except `src/main.js`).
+- `npx playwright install chromium` is needed once, before the first e2e run.
+- `npm run test:e2e` runs the Playwright browser tests.
+- `npm run test:e2e:coverage` also fails if browser coverage of `src/main.js`
+  is below 80%.
+
+The e2e tests shorten the game's timers with query parameters, which also work
+by hand, e.g. `http://localhost:8000/?dwell=50&hold=50&advance=250`. Each is an
+integer number of milliseconds from 0 to 10000 (0 changes how the game plays:
+`hold=0` detaches coins instantly so stacks cannot be dragged as a group, and
+`advance=0` removes the double-press guard):
+
+- `dwell`: how long a coin is held before its value is revealed.
+- `hold`: how long a coin is held to separate it from a stack.
+- `advance`: the guard after a correct Cashier answer before Next works.
 
 ## Deploy
 

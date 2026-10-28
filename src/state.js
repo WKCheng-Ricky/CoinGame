@@ -147,6 +147,6 @@ export function submitCheck(state, now) {
   return { ...state, message: { text, kind: "hint" } };
 }
 
-export function canAdvance(state, now) {
-  return state.solved && now - state.solvedAt >= ADVANCE_DELAY_MS;
+export function canAdvance(state, now, delayMs = ADVANCE_DELAY_MS) {
+  return state.solved && now - state.solvedAt >= delayMs;
 }

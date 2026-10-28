@@ -1,5 +1,6 @@
 import { describePile, detachNudge, formatPence, parseAmount, randomTarget, total, unitUids } from "./game.js";
 import { createDwell } from "./dwell.js";
+import { timingFromSearch } from "./config.js";
 import { createDrag, createTrayDrag } from "./drag.js";
 import { announce, renderPile, renderTray, setText, showStackBadges } from "./render.js";
 import {
@@ -16,7 +17,10 @@ let shownMessage = state.message;
 let shownPile;
 let detachedUid = null; // the held, detached coin: it does not count toward stack badges
 
+const timing = timingFromSearch(location.search);
+
 const dwell = createDwell({
+  delay: timing.dwellMs,
   onReveal: (el) => el.classList.add("revealed"),
   onHide: (el) => el.classList.remove("revealed"),
 });
@@ -200,6 +204,7 @@ trayDrag = createTrayDrag($("play-tray"), {
 watchDwell($("play-tray"));
 // created before the pile's watchDwell so its listeners run first
 drag = createDrag($("play-pile"), {
+  holdMs: timing.detachHoldMs,
   onMove: moveAndRefocus,
   onMoveGroup: moveGroupAndRefocus,
   getGroup: (uid) => unitUids(state.pile, uid),
@@ -280,7 +285,7 @@ $("btn-check").addEventListener("click", () => {
   if (state.solved) document.querySelector(".actions button:not([hidden])").focus();
 });
 $("btn-next").addEventListener("click", () => {
-  if (!canAdvance(state, performance.now())) return;
+  if (!canAdvance(state, performance.now(), timing.advanceDelayMs)) return;
   if (state.mode === "cashier") {
     resetPileDom();
     beginRound(nextCustomer(state));
@@ -290,7 +295,7 @@ $("btn-next").addEventListener("click", () => {
   }
 });
 $("btn-again").addEventListener("click", () => {
-  if (canAdvance(state, performance.now())) beginRound(nextRound(state, state.target));
+  if (canAdvance(state, performance.now(), timing.advanceDelayMs)) beginRound(nextRound(state, state.target));
 });
 $("btn-cashier").addEventListener("click", () => {
   resetPileDom();
