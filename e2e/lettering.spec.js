@@ -12,10 +12,20 @@ test("real letter ink clears the rim line and the body edge by 0.5 units on ever
     const { coinSvg } = await import("/src/render.js");
     const { shapeRadiusAt } = await import("/src/shapes.js");
     const PX = 10;
+    // An SVG drawn as an image cannot see the page's @font-face, so the same files go inside it as data URIs.
+    const dataUri = async (name) => {
+      const bytes = new Uint8Array(await (await fetch(`/fonts/${name}`)).arrayBuffer());
+      let bin = "";
+      for (const b of bytes) bin += String.fromCharCode(b);
+      return `data:font/woff2;base64,${btoa(bin)}`;
+    };
+    const faces = [[600, "NotoSans-SemiBold-subset.woff2"], [700, "NotoSans-Bold-subset.woff2"]];
+    let style = "";
+    for (const [weight, file] of faces) style += `@font-face{font-family:CoinLetters;font-weight:${weight};src:url(${await dataUri(file)}) format("woff2")}`;
     const out = {};
     for (const coin of COINS.filter((c) => c.wording.flow !== "straight")) {
       const words = coinSvg(coin).match(/<text class="coin-word"[^>]*>.<\/text>/g).join("");
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${100 * PX}" height="${100 * PX}">${words}</svg>`;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${100 * PX}" height="${100 * PX}"><style>${style}</style>${words}</svg>`;
       const img = new Image();
       img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
       await img.decode();

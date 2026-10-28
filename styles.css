@@ -66,6 +66,10 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 
+/* Coin lettering is measured against these glyphs (e2e/lettering.spec.js), so it must not depend on the system font. Noto Sans, SIL OFL 1.1, subset to letters, digits and the pound sign. */
+@font-face { font-family: "CoinLetters"; font-weight: 600; font-display: swap; src: url("fonts/NotoSans-SemiBold-subset.woff2") format("woff2"); }
+@font-face { font-family: "CoinLetters"; font-weight: 700; font-display: swap; src: url("fonts/NotoSans-Bold-subset.woff2") format("woff2"); }
+
 html, body { height: 100%; overflow: hidden; }
 
 body {
