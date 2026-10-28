@@ -1,29 +1,46 @@
 import { COINS } from "./coins.js";
+import { arcLetters, polygonPoints, reuleauxPath } from "./shapes.js";
 import { PILE_HEIGHT_MM, PILE_MARGIN_MM, PILE_WIDTH_MM, pileBox, stackCounts } from "./game.js";
 
-const SIDES = { heptagon: 7, dodecagon: 12 };
-const STROKE = "#00000055";
 
-function polygonPoints(sides, radius) {
-  const pts = [];
-  for (let i = 0; i < sides; i++) {
-    const angle = (2 * Math.PI * i) / sides - Math.PI / 2;
-    pts.push(`${(50 + radius * Math.cos(angle)).toFixed(2)},${(50 + radius * Math.sin(angle)).toFixed(2)}`);
-  }
-  return pts.join(" ");
+// Layout of one face, in viewBox units (a round coin's body is 92 wide, its rim line 78 wide).
+const BODY_WIDTH = 92;
+const RIM_WIDTH = 78;
+const WORD_RADIUS = 40.6; // baseline radius of the wording, just outside the rim line
+const WORD_SIZE = 4.6;
+const SHINE_RADIUS = 35;
+
+function outlineShape(coin, cls, width, fill, strokeWidth, extra = "") {
+  const attrs = `class="${cls}" ${fill ? `fill="${fill}"` : 'fill="none"'} stroke-width="${strokeWidth}"${extra}`;
+  if (coin.shape === "heptagon") return `<path ${attrs} d="${reuleauxPath(7, width)}"/>`;
+  if (coin.shape === "dodecagon") return `<polygon ${attrs} points="${polygonPoints(12, width / 2)}"/>`;
+  return `<circle ${attrs} cx="50" cy="50" r="${width / 2}"/>`;
 }
 
+function shineArc() {
+  const point = (deg) => {
+    const a = ((deg - 90) * Math.PI) / 180;
+    return `${(50 + SHINE_RADIUS * Math.cos(a)).toFixed(2)},${(50 + SHINE_RADIUS * Math.sin(a)).toFixed(2)}`;
+  };
+  return `M${point(-75)} A${SHINE_RADIUS},${SHINE_RADIUS} 0 0 1 ${point(-30)}`;
+}
+
+function wordingLetters(coin) {
+  return arcLetters(coin.wording, WORD_RADIUS, WORD_SIZE).map(({ char, angle }) =>
+    `<text class="coin-word" x="50" y="${(50 - WORD_RADIUS).toFixed(2)}" text-anchor="middle" transform="rotate(${angle.toFixed(2)} 50 50)" font-family="system-ui, sans-serif" font-weight="700" font-size="${WORD_SIZE}" fill="#222">${char}</text>`).join("");
+}
+
+// Layers, outside in: body, rim line, shine, inner disc (two-metal coins), wording, numeral.
 export function coinSvg(coin) {
-  const sides = SIDES[coin.shape];
-  const outline = sides
-    ? `<polygon points="${polygonPoints(sides, 46)}" fill="${coin.fill}" stroke="${STROKE}" stroke-width="3"/>`
-    : `<circle cx="50" cy="50" r="46" fill="${coin.fill}" stroke="${STROKE}" stroke-width="3"/>`;
-  const inner = coin.ring
-    ? `<circle cx="50" cy="50" r="31" fill="${coin.ring}" stroke="${STROKE}" stroke-width="2"/>`
+  const body = outlineShape(coin, "coin-body coin-edge", BODY_WIDTH, coin.fill, 3);
+  const rim = outlineShape(coin, "coin-rim", RIM_WIDTH, null, 1, ` stroke="${coin.shade.dark}"`);
+  const shine = `<path class="coin-shine" d="${shineArc()}" fill="none" stroke="${coin.shade.light}" stroke-width="2.5" stroke-linecap="round" opacity="0.9"/>`;
+  const disc = coin.ring
+    ? `<circle class="coin-disc coin-edge" cx="50" cy="50" r="31" fill="${coin.ring}" stroke-width="2"/>`
     : "";
   const size = coin.label.length > 2 ? 28 : 34;
   const label = `<text class="coin-label" x="50" y="50" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif" font-weight="700" font-size="${size}" fill="#222">${coin.label}</text>`;
-  return `<svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">${outline}${inner}${label}</svg>`;
+  return `<svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">${body}${rim}${shine}${disc}${wordingLetters(coin)}${label}</svg>`;
 }
 
 function placeCoin(btn, entry) {

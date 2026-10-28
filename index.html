@@ -2,13 +2,21 @@
 <html lang="en-GB">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Coin Game</title>
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f6f3ec">
+  <script src="theme-boot.js"></script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <main>
     <section id="screen-home">
+      <button id="btn-theme" class="theme-toggle" type="button" data-state="auto" aria-label="Theme: Auto. Press to switch to Light" title="Theme: Auto. Press to switch to Light">
+        <svg class="icon-auto" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg>
+        <svg class="icon-light" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+        <svg class="icon-dark" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z" fill="currentColor"/></svg>
+      </button>
       <h1 tabindex="-1">Coin Game</h1>
       <p>Make the amount using UK coins.</p>
       <fieldset class="difficulty">
@@ -37,17 +45,24 @@
     </section>
 
     <section id="screen-play" hidden>
-      <h1 id="play-heading" class="target" tabindex="-1"><span id="play-heading-label" class="label">Make</span> <span id="play-target"></span></h1>
-      <p id="play-rounds" class="rounds" hidden></p>
+      <header class="topbar">
+        <button id="btn-back">&lsaquo; Back</button>
+        <div class="topbar-info">
+          <h1 id="play-heading" class="target" tabindex="-1"><span id="play-heading-label" class="label">Make</span> <span id="play-target"></span></h1>
+          <p id="play-rounds" class="rounds" hidden></p>
+        </div>
+      </header>
       <div class="board" data-difficulty="normal">
         <div class="pile-area">
           <h2 id="pile-heading">Your coins</h2>
+          <p class="scale-note">1 square = 1 cm on a real coin</p>
           <div id="play-pile" class="pile"></div>
           <p id="play-pile-summary" class="sr-only"></p>
           <p id="play-total" class="total" aria-live="polite"></p>
         </div>
         <div class="tray-area">
           <h2>Add a coin</h2>
+          <p class="scale-note">1 square = 1 cm on a real coin</p>
           <div id="play-tray" class="tray"></div>
         </div>
       </div>
@@ -63,7 +78,6 @@
         <button id="btn-next" class="primary" hidden>Next</button>
         <button id="btn-again" class="primary" hidden>Play again</button>
         <button id="btn-change" hidden>Change amount</button>
-        <button id="btn-back">Back</button>
       </div>
     </section>
   </main>

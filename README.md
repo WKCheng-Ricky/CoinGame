@@ -23,6 +23,15 @@ touch stack, and a stack shows its count (×2, ×3, ...); different coins push
 apart. Dragging a stack moves it together; hold a coin for 1 second to take it
 off the stack, and it stays off when you let go. Press Check when the total matches.
 
+- **Theme:** Auto (the default) follows the device's light or dark setting. The
+  round icon button in the top-right corner of Home cycles Auto, Light, Dark with
+  each press (the icon and its label show the current choice). The choice is saved
+  in the browser. Browsers older than 2024 (no CSS `light-dark()`) show the light
+  theme and no theme button.
+- **Reference grid:** the pile and the tray have a faint graph-paper grid where
+  one square is 1 cm on a real coin, at the coins' own scale, so coins of near
+  sizes (1p and 5p, 20p and 50p) can be compared by eye.
+
 Plain HTML, CSS and JavaScript (ES modules). No build step, no dependencies.
 
 ## Run
@@ -53,7 +62,11 @@ npm run test:e2e:coverage
 - `npm run test:coverage` adds a per-file 80% gate on lines,
   branches and functions for `src/` (except `src/main.js`).
 - `npx playwright install chromium` is needed once, before the first e2e run.
-- `npm run test:e2e` runs the Playwright browser tests.
+- `npm run test:e2e` runs the Playwright browser tests: gameplay and drag specs,
+  plus `e2e/theme.spec.js` (the theme button, cycling and saving), `e2e/phone.spec.js`
+  (sticky bars on phone sizes, centred Home), `e2e/coins.spec.js` (coin wording and
+  rotation), `e2e/grid.spec.js` (coin sizes and grid scale) and `e2e/contrast.spec.js`
+  (WCAG contrast in both themes).
 - `npm run test:e2e:coverage` also fails if browser coverage of `src/main.js`
   is below 80%.
 
@@ -78,6 +91,9 @@ Any static host works, e.g. GitHub Pages.
 - `src/state.js`: pure game state transitions
 - `src/drag.js`: drag geometry and the pile and tray drag controllers
 - `src/dwell.js`: hold-to-reveal timers
+- `src/shapes.js`: coin outline geometry (polygons, Reuleaux heptagon, curved lettering)
+- `src/theme.js`: reading, saving, applying and cycling the theme choice
+- `theme-boot.js`: classic script that applies a saved theme before first paint
 - `src/render.js`: coin SVGs and DOM rendering
 - `src/main.js`: app state and event wiring
 - `docs/superpowers/`: design specs and implementation plans

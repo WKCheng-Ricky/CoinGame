@@ -2,6 +2,7 @@ import { describePile, detachNudge, formatPence, parseAmount, randomTarget, tota
 import { createDwell } from "./dwell.js";
 import { timingFromSearch } from "./config.js";
 import { createDrag, createTrayDrag } from "./drag.js";
+import { applyTheme, getStorage, nextTheme, readTheme, saveTheme, themeLabel } from "./theme.js";
 import { announce, renderPile, renderTray, setText, showStackBadges } from "./render.js";
 import {
   addToPile, canAdvance, clearPile, createState, isContinuous, nextCustomer, nextRound, startCashier, submitAnswer,
@@ -16,6 +17,34 @@ let state = createState();
 let shownMessage = state.message;
 let shownPile;
 let detachedUid = null; // the held, detached coin: it does not count toward stack badges
+
+function syncThemeColor() {
+  const meta = document.querySelector('meta[name="theme-color"]');
+  // light-dark() stays unresolved in a custom property, so read the body's resolved colour
+  if (meta) meta.content = getComputedStyle(document.body).backgroundColor;
+}
+
+function initTheme() {
+  const storage = getStorage(window);
+  let theme = readTheme(storage);
+  const button = $("btn-theme");
+  const show = () => {
+    applyTheme(document.documentElement, theme);
+    syncThemeColor();
+    if (!button) return;
+    button.dataset.state = theme;
+    button.setAttribute("aria-label", themeLabel(theme));
+    button.title = themeLabel(theme);
+  };
+  show();
+  button?.addEventListener("click", () => {
+    theme = nextTheme(theme);
+    saveTheme(storage, theme);
+    show();
+  });
+  window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", syncThemeColor);
+}
+initTheme();
 
 const timing = timingFromSearch(location.search);
 
