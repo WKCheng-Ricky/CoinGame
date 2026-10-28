@@ -5,8 +5,9 @@ import {
   ADVANCE_DELAY_MS, createState, startGame, nextRound,
   addToPile, removeFromPile, clearPile, submitCheck, canAdvance,
   setDifficulty, moveCoin, settleCoin, addToPileAt, moveGroup, settleGroupCoins,
+  startCashier, nextCustomer, submitAnswer, isContinuous,
 } from "../src/state.js";
-import { stackCounts, total, PUSH_FACTOR, PILE_WIDTH_MM, PILE_HEIGHT_MM, STACK_STEP_MM, detachNudge } from "../src/game.js";
+import { formatPence, randomHandful, stackCounts, total, PUSH_FACTOR, PILE_WIDTH_MM, PILE_HEIGHT_MM, STACK_STEP_MM, detachNudge } from "../src/game.js";
 import { coinById } from "../src/coins.js";
 
 const EXACT_395 = pileOf("£2", "£1", "50p", "20p", "20p", "5p");
@@ -395,4 +396,119 @@ test("a nudged top coin leaves a 3-stack and does not snap back", () => {
   assert.equal(counts.size, 1);
   assert.equal(counts.get(2), 2);
   assert.ok(!counts.has(3));
+});
+
+test("startCashier starts a fresh cashier game with a handful", () => {
+  const s = startCashier(createState(), seeded(3));
+  assert.equal(s.mode, "cashier");
+  assert.equal(s.rounds, 0);
+  assert.equal(s.target, 0);
+  assert.equal(s.solved, false);
+  assert.deepEqual(s.message, { text: "", kind: "" });
+  assert.ok(s.pile.length >= 2 && s.pile.length <= 12);
+  assert.equal(new Set(s.pile.map((e) => e.uid)).size, s.pile.length);
+  assert.equal(s.nextUid, s.pile.length + 1);
+  for (const e of s.pile) {
+    assert.ok(Number.isFinite(e.x) && Math.abs(e.x) <= 0.5);
+    assert.ok(Number.isFinite(e.y) && Math.abs(e.y) <= 0.5);
+    assert.ok(Number.isInteger(e.rot));
+  }
+});
+
+test("startCashier keeps difficulty and resets old state", () => {
+  const easy = setDifficulty(createState(), "easy");
+  assert.equal(startCashier(easy, seeded(1)).difficulty, "easy");
+  const old = { ...easy, rounds: 5, message: { text: "x", kind: "hint" }, pile: pileOf("£1"), nextUid: 2 };
+  const s = startCashier(old, seeded(2));
+  assert.equal(s.rounds, 0);
+  assert.deepEqual(s.message, { text: "", kind: "" });
+  assert.ok(s.pile.length >= 2);
+  assert.equal(s.nextUid, s.pile.length + 1);
+});
+
+test("startCashier handfuls can stack, and stacked coins stay separate entries", () => {
+  let stacked = 0;
+  let plain = 0;
+  for (let seed = 1; seed <= 200; seed++) {
+    const s = startCashier(createState(), seeded(seed));
+    if (stackCounts(s.pile).size > 0) {
+      stacked++;
+      const expected = randomHandful(seeded(seed)); // the deal draws its ids first
+      assert.equal(s.pile.length, s.nextUid - 1);
+      assert.deepEqual(s.pile.map((e) => e.coinId).sort(), [...expected].sort());
+      assert.equal(total(s.pile), expected.reduce((sum, id) => sum + coinById(id).pence, 0));
+    } else plain++;
+  }
+  assert.ok(stacked > 0);
+  assert.ok(plain > 0);
+});
+
+test("nextCustomer keeps rounds and mode, resets solved and message, and changes the pile", () => {
+  const first = startCashier(createState(), seeded(4));
+  const solved = submitAnswer(first, total(first.pile), 100);
+  const next = nextCustomer(solved, seeded(9));
+  assert.equal(next.mode, "cashier");
+  assert.equal(next.rounds, 1);
+  assert.equal(next.solved, false);
+  assert.deepEqual(next.message, { text: "", kind: "" });
+  const ids = (s) => s.pile.map((e) => e.coinId).sort().join(",");
+  assert.notEqual(ids(next), ids(first));
+});
+
+test("submitAnswer with the exact total solves once", () => {
+  const s = startCashier(createState(), seeded(5));
+  const solved = submitAnswer(s, total(s.pile), 1000);
+  assert.equal(solved.solved, true);
+  assert.equal(solved.solvedAt, 1000);
+  assert.equal(solved.rounds, 1);
+  assert.deepEqual(solved.message, { text: `Correct! That is ${formatPence(total(s.pile))}.`, kind: "success" });
+  const again = submitAnswer(solved, total(s.pile), 2000);
+  assert.equal(again, solved);
+  assert.equal(again.rounds, 1);
+});
+
+test("submitAnswer hints Too high / Too low and leaves the pile alone", () => {
+  const s = startCashier(createState(), seeded(6));
+  const t = total(s.pile);
+  const high = submitAnswer(s, t + 1, 0);
+  const low = submitAnswer(s, t - 1, 0);
+  assert.equal(high.message.text, "Too high");
+  assert.equal(high.message.kind, "hint");
+  assert.equal(low.message.text, "Too low");
+  assert.equal(high.pile, s.pile);
+  assert.equal(low.solved, false);
+  const again = submitAnswer(high, t + 1, 0);
+  assert.notEqual(again.message, high.message);
+  assert.equal(again.message.text, high.message.text);
+});
+
+test("isContinuous is true for endless and cashier only", () => {
+  assert.equal(isContinuous(createState()), true);
+  assert.equal(isContinuous(startCashier(createState(), seeded(1))), true);
+  assert.equal(isContinuous(startGame(createState(), "custom", 395)), false);
+});
+
+test("canAdvance after a correct cashier answer waits for the delay", () => {
+  const s = startCashier(createState(), seeded(7));
+  const solved = submitAnswer(s, total(s.pile), 1000);
+  assert.equal(canAdvance(solved, 1000 + ADVANCE_DELAY_MS - 1), false);
+  assert.equal(canAdvance(solved, 1000 + ADVANCE_DELAY_MS), true);
+});
+
+test("cashier mode blocks adding, removing and clearing coins", () => {
+  const s = startCashier(createState(), seeded(8));
+  assert.equal(addToPile(s, "£1", seeded(1)), s);
+  assert.equal(addToPileAt(s, "£1", 0, 0, seeded(1)), s);
+  assert.equal(removeFromPile(s, s.pile[0].uid), s);
+  assert.equal(clearPile(s), s);
+});
+
+test("moving and settling in cashier mode keeps the coins and total", () => {
+  const s = startCashier(createState(), seeded(10));
+  const uid = s.pile[0].uid;
+  const moved = moveCoin(s, uid, 0.1, 0.1);
+  const settled = settleCoin(moved, uid, { x: s.pile[0].x, y: s.pile[0].y });
+  const ids = (st) => st.pile.map((e) => e.coinId).sort();
+  assert.deepEqual(ids(settled), ids(s));
+  assert.equal(total(settled.pile), total(s.pile));
 });

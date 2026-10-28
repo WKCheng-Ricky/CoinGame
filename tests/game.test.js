@@ -11,6 +11,9 @@ import {
 import {
   settlePile, settleGroup, unitUids, STACK_STEP_MM, STACK_LINK_MM, PUSH_FACTOR, MAX_SETTLE_PASSES, stackCounts, DETACH_NUDGE_MM, detachNudge,
 } from "../src/game.js";
+import {
+  randomHandful, placeHandfulCoin, checkAnswer, MAX_HANDFUL, STACK_CHANCE,
+} from "../src/game.js";
 import { seeded, seq, pileOf } from "./pile-helper.js";
 
 function approx(a, b, tol = 1e-9) {
@@ -547,4 +550,92 @@ test("detachNudge moves hypot(5, 5) mm when unclamped", () => {
   const to = detachNudge(from);
   approx(Math.hypot((to.x - from.x) * PILE_WIDTH_MM, (to.y - from.y) * PILE_HEIGHT_MM),
     Math.hypot(DETACH_NUDGE_MM.x, DETACH_NUDGE_MM.y));
+});
+
+const sortedIds = (ids) => [...ids].sort().join(",");
+
+test("randomHandful draws 2 to MAX_HANDFUL real coins", () => {
+  assert.equal(randomHandful(() => 0).length, 2);
+  assert.equal(randomHandful(() => 0.999999).length, MAX_HANDFUL);
+  assert.equal(MAX_HANDFUL, 12);
+  for (let s = 1; s <= 200; s++) {
+    const ids = randomHandful(seeded(s));
+    assert.ok(ids.length >= 2 && ids.length <= MAX_HANDFUL);
+    for (const id of ids) assert.notEqual(coinById(id), undefined);
+  }
+});
+
+test("randomHandful maps rng values onto COINS denominations", () => {
+  const values = [0, 0.13, 0.5, 0.99];
+  // count = 2 + floor(0.2 * 11) = 4
+  const ids = randomHandful(seq([0.2, ...values]));
+  assert.deepEqual(ids, values.map((r) => COINS[Math.floor(r * 8)].id));
+});
+
+test("randomHandful re-rolls once when it repeats the previous handful", () => {
+  let checked = 0;
+  for (let s = 1; s <= 200; s++) {
+    const first = randomHandful(seeded(s));
+    const rng = seeded(s);
+    randomHandful(rng);
+    const second = randomHandful(rng);
+    if (sortedIds(first) === sortedIds(second)) continue;
+    const prev = [...first].reverse();
+    assert.deepEqual(randomHandful(seeded(s), prev), second);
+    checked++;
+  }
+  assert.ok(checked > 0);
+  assert.deepEqual(randomHandful(() => 0, ["1p", "1p"]), ["1p", "1p"]);
+});
+
+test("placeHandfulCoin stacks on a same-denomination coin when the chance draw hits", () => {
+  const pile = pileOf("20p");
+  const coin = coinById("20p");
+  assert.ok(0.1 < STACK_CHANCE);
+  const spot = placeHandfulCoin(pile, coin, seq([0.1, 0, 0.5]));
+  assert.equal(spot.x, 0);
+  assert.equal(spot.y, 0);
+});
+
+test("placeHandfulCoin falls through to placeCoin when the chance draw misses", () => {
+  const pile = pileOf("20p");
+  const coin = coinById("20p");
+  const rest = [0.3, 0.6, 0.2, 0.7, 0.4];
+  assert.deepEqual(
+    placeHandfulCoin(pile, coin, seq([0.9, ...rest])),
+    placeCoin(pile, coin, seq(rest)),
+  );
+});
+
+test("placeHandfulCoin makes no extra draw without a same-denomination coin", () => {
+  const coin = coinById("20p");
+  for (const pile of [[], pileOf("1p", "£1")]) {
+    const a = seq([0.3, 0.6, 0.2, 0.7]);
+    const b = seq([0.3, 0.6, 0.2, 0.7]);
+    assert.deepEqual(placeHandfulCoin(pile, coin, a), placeCoin(pile, coin, b));
+    assert.equal(a(), b());
+  }
+});
+
+test("placeHandfulCoin picks the same-denomination entry by index", () => {
+  const pile = pileOf("20p", "20p");
+  pile[0].x = -0.3; pile[0].y = -0.2;
+  pile[1].x = 0.3; pile[1].y = 0.2;
+  const coin = coinById("20p");
+  assert.deepEqual(placeHandfulCoin(pile, coin, seq([0.1, 0, 0.5])), { x: -0.3, y: -0.2, rot: 180 });
+  const second = placeHandfulCoin(pile, coin, seq([0.1, 0.99, 0.25]));
+  assert.equal(second.x, 0.3);
+  assert.equal(second.y, 0.2);
+  assert.equal(second.rot, 90);
+});
+
+test("checkAnswer compares the answer with the pile total", () => {
+  assert.equal(checkAnswer(pileOf("£1", "50p"), 150), "exact");
+  assert.equal(checkAnswer(pileOf("£1", "50p"), 200), "over");
+  assert.equal(checkAnswer(pileOf("£1", "50p"), 100), "under");
+  assert.equal(checkAnswer(pileOf("50p", "50p", "50p"), 150), "exact");
+});
+
+test("describePile accepts a custom intro", () => {
+  assert.equal(describePile(pileOf("20p", "20p", "£1"), "On the counter"), "On the counter: 2 × 20p, 1 × £1");
 });

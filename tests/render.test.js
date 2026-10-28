@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { COINS, coinById } from "../src/coins.js";
-import { coinSvg } from "../src/render.js";
+import { coinLabel, coinSvg } from "../src/render.js";
 
 const count = (s, re) => (s.match(re) ?? []).length;
 const pointPairs = (svg) => {
@@ -41,4 +41,9 @@ test("every coin label is tagged so CSS can hide it", () => {
   for (const coin of COINS) {
     assert.ok(coinSvg(coin).includes('<text class="coin-label"'), coin.id);
   }
+});
+
+test("coinLabel names removable coins by action and fixed coins by name", () => {
+  assert.equal(coinLabel(coinById("20p"), true), "Remove 20p");
+  assert.equal(coinLabel(coinById("20p"), false), "20p coin");
 });

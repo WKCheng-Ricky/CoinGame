@@ -3,7 +3,7 @@ import { createDwell } from "./dwell.js";
 import { createDrag, createTrayDrag } from "./drag.js";
 import { announce, renderPile, renderTray, setText, showStackBadges } from "./render.js";
 import {
-  addToPile, canAdvance, clearPile, createState, nextRound,
+  addToPile, canAdvance, clearPile, createState, isContinuous, nextCustomer, nextRound, startCashier, submitAnswer,
   addToPileAt, moveCoin, moveGroup, removeFromPile, settleCoin, settleGroupCoins, setDifficulty,
   startGame, submitCheck,
 } from "./state.js";
@@ -85,7 +85,7 @@ function removeCoin(uidText) {
   // the pile is re-rendered, so hand focus back to keep keyboard use flowing
   const top = [...document.querySelectorAll("#play-pile .pile-coin")].pop();
   const target = top ?? $("play-tray").querySelector(`[data-coin="${entry.coinId}"]`);
-  target.focus({ preventScroll: true });
+  target?.focus({ preventScroll: true });
 }
 
 function showScreen(name) {
@@ -95,17 +95,24 @@ function showScreen(name) {
 }
 
 function render() {
-  const endless = state.mode === "endless";
-  setText($("play-target"), formatPence(state.target));
+  const endless = isContinuous(state);
+  const cashier = state.mode === "cashier";
+  setText($("play-heading-label"), cashier ? "Customer's coins" : "Make");
+  setText($("play-target"), cashier ? "How much?" : formatPence(state.target));
   if (state.pile !== shownPile) {
-    renderPile($("play-pile"), state.pile, detachedUid);
-    setText($("play-pile-summary"), describePile(state.pile));
+    renderPile($("play-pile"), state.pile, detachedUid, !cashier);
+    setText($("play-pile-summary"), cashier ? describePile(state.pile, "On the counter") : describePile(state.pile));
     shownPile = state.pile;
     // drop dwells on removed pile coins (untouched pile and tray coins keep theirs)
     dwell.prune((el) => el.isConnected);
   }
   document.querySelector(".board").dataset.difficulty = state.difficulty;
-  setText($("play-total"), `Your total: ${formatPence(total(state.pile))}`);
+  setText($("play-total"), cashier ? "" : `Your total: ${formatPence(total(state.pile))}`);
+  $("play-total").hidden = cashier;
+  document.querySelector(".tray-area").hidden = cashier;
+  $("cashier-answer").hidden = !cashier;
+  $("cashier-input").disabled = state.solved;
+  setText($("pile-heading"), cashier ? "On the counter" : "Your coins");
   // each submitCheck makes a new message object, so a repeated hint is announced again
   if (state.message !== shownMessage) {
     shownMessage = state.message;
@@ -113,14 +120,15 @@ function render() {
   }
   $("play-message").className = `message ${state.message.kind}`.trim();
   $("play-rounds").hidden = !endless;
-  setText($("play-rounds"), `Rounds completed: ${state.rounds}`);
+  setText($("play-rounds"), `${cashier ? "Customers served" : "Rounds completed"}: ${state.rounds}`);
   $("btn-check").hidden = state.solved;
-  $("btn-clear").hidden = state.solved;
+  $("btn-clear").hidden = state.solved || cashier;
   $("btn-next").hidden = !(state.solved && endless);
   $("btn-again").hidden = !(state.solved && !endless);
   $("btn-change").hidden = !(state.solved && !endless);
 
   document.querySelector(".board").classList.toggle("locked", state.solved);
+  document.querySelector(".board").classList.toggle("single", cashier);
   for (const btn of document.querySelectorAll(".coin, .pile-coin")) {
     if (state.solved) btn.setAttribute("aria-disabled", "true");
     else btn.removeAttribute("aria-disabled");
@@ -130,6 +138,12 @@ function render() {
 function update(next) {
   state = next;
   render();
+}
+
+// uids restart per deal, so a new cashier deal must not reuse any old button
+function resetPileDom() {
+  $("play-pile").replaceChildren();
+  dwell.prune((el) => el.isConnected);
 }
 
 function beginRound(next) {
@@ -233,15 +247,56 @@ $("play-pile").addEventListener("keydown", (e) => {
   moveAndRefocus(entry.uid, entry.x + dir[0] * step, entry.y + dir[1] * step);
 });
 $("btn-clear").addEventListener("click", () => update(clearPile(state)));
+
+function resetCashierInput() {
+  const input = $("cashier-input");
+  input.value = "";
+  input.disabled = false;
+  input.removeAttribute("aria-invalid");
+  announce($("cashier-error"), "");
+}
+
+function checkCashier() {
+  if (state.solved) return;
+  const input = $("cashier-input");
+  const result = parseAmount(input.value);
+  if (!result.ok) {
+    input.setAttribute("aria-invalid", "true");
+    announce($("cashier-error"), result.error);
+    return;
+  }
+  input.removeAttribute("aria-invalid");
+  announce($("cashier-error"), "");
+  update(submitAnswer(state, result.pence, performance.now()));
+  if (state.solved) document.querySelector(".actions button:not([hidden])").focus();
+}
+
+$("cashier-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); checkCashier(); }
+});
 $("btn-check").addEventListener("click", () => {
+  if (state.mode === "cashier") { checkCashier(); return; }
   update(submitCheck(state, performance.now()));
   if (state.solved) document.querySelector(".actions button:not([hidden])").focus();
 });
 $("btn-next").addEventListener("click", () => {
-  if (canAdvance(state, performance.now())) beginRound(nextRound(state, randomTarget(state.target)));
+  if (!canAdvance(state, performance.now())) return;
+  if (state.mode === "cashier") {
+    resetPileDom();
+    beginRound(nextCustomer(state));
+    resetCashierInput();
+  } else {
+    beginRound(nextRound(state, randomTarget(state.target)));
+  }
 });
 $("btn-again").addEventListener("click", () => {
   if (canAdvance(state, performance.now())) beginRound(nextRound(state, state.target));
+});
+$("btn-cashier").addEventListener("click", () => {
+  resetPileDom();
+  update(startCashier(state));
+  resetCashierInput();
+  showScreen("play");
 });
 $("btn-endless").addEventListener("click", () => {
   update(startGame(state, "endless", randomTarget()));
