@@ -223,3 +223,34 @@ test("each metal is at least 3:1 against the pile in dark; in light the fills ar
     expect(m.fills.silver).not.toBe(m.fills.gold);
   }
 });
+
+test("the ink on the coins is readable on every metal in both themes", async ({ page }) => {
+  // The numeral is large bold text (WCAG: 3:1). The inscription wording is decorative text on a coin face, so it
+  // is exempt from the 4.5:1 rule, but we still hold it to 4.0:1: the dark copper (kept at least 3:1 against the
+  // dark pile) cannot be lightened far, so near-black ink on it reaches about 4.7:1, not a full 7:1.
+  const NUMERAL_MIN = 3, WORDING_MIN = 4.0;
+  for (const scheme of ["light", "dark"]) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await page.goto("/?" + FAST);
+    await page.getByRole("button", { name: "Endless", exact: true }).click();
+    const rows = await page.evaluate(`(() => {
+      const parse = (css) => css.match(/-?[\\d.]+(?:e-?\\d+)?/g).map(Number).slice(0, 3).map((v, i) => css.startsWith("color(") ? v * 255 : v);
+      const lum = (rgb) => { const [r, g, b] = rgb.map((v) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; }); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+      const ratio = (a, b) => { const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
+      const out = [];
+      for (const coin of document.querySelectorAll("#play-tray [data-coin]")) {
+        const fill = (sel) => parse(getComputedStyle(coin.querySelector(sel)).fill);
+        const body = fill(".coin-body"), under = coin.querySelector(".coin-disc") ? fill(".coin-disc") : body;
+        out.push({ id: coin.dataset.coin,
+          numeral: ratio(fill(".coin-label"), under),
+          wording: Math.min(...[...coin.querySelectorAll(".coin-word")].map((w) => ratio(parse(getComputedStyle(w).fill), body))) });
+      }
+      return out;
+    })()`);
+    expect(rows.length).toBe(8);
+    for (const r of rows) {
+      expect(r.numeral, `${scheme} ${r.id} numeral`).toBeGreaterThanOrEqual(NUMERAL_MIN);
+      expect(r.wording, `${scheme} ${r.id} wording`).toBeGreaterThanOrEqual(WORDING_MIN);
+    }
+  }
+});

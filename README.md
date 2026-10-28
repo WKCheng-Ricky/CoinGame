@@ -31,8 +31,9 @@ touch stack, and a stack shows its count (×2, ×3, ...); different coins push
 apart. Dragging a stack moves it together; hold a coin for 1 second to take it
 off the stack, and it stays off when you let go. Press Check when the total matches,
 or press Enter (Ctrl+Enter or Cmd+Enter works even while a coin or button has focus).
-Enter on a focused coin or button keeps its own meaning, and after a correct answer
-it does nothing.
+Enter on a focused coin or button keeps its own meaning. After a correct answer
+the Enter shortcut does nothing; pressing Enter again on the focused Next button
+presses it, like any button.
 
 - **Phone-sized frame:** the whole app lives in a phone-shaped frame (up to
   433 x 771 px). On a phone it fills the screen; on a bigger screen it is a rounded
@@ -106,6 +107,8 @@ npm run test:e2e:coverage
   wording, metals and rotation), `e2e/grid.spec.js` (coin sizes and grid scale),
   `e2e/server.spec.js` (the static server's cache header) and `e2e/contrast.spec.js`
   (WCAG contrast in both themes).
+- The e2e specs run in parallel, one spec file per worker: 6 workers locally, 2 when
+  `CI` is set. Set `E2E_WORKERS=n` to change it (`E2E_WORKERS=1` runs them in order).
 - `npm run test:e2e:coverage` also fails if browser coverage of `src/main.js`
   is below 80%.
 

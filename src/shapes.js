@@ -41,15 +41,14 @@ export function fitFont(text, radius, spanDeg = 72, maxFont = 8.5) {
 // Letters of `text` along a circle: `angle` is each non-space letter's position in degrees clockwise
 // from the top, centred on `at`. Spaces take up room but get no entry.
 // "outer" runs clockwise with the tops outward. "upright" is for text along the bottom: it runs
-// counter-clockwise, so the angles fall and it reads left to right, and `flip` marks it for the
-// renderer (which sets the letters upright, tops toward the centre).
+// counter-clockwise, so the angles fall and it reads left to right.
 export function arcLetters(text, radius, fontSize, at = 0, flow = "outer") {
   const step = ((fontSize * ADVANCE) / radius) * (180 / Math.PI) * (flow === "upright" ? -1 : 1);
   const chars = [...text];
   const mid = (chars.length - 1) / 2;
   const out = [];
   chars.forEach((char, i) => {
-    if (char !== " ") out.push({ char, angle: at + (i - mid) * step, flip: flow === "upright" });
+    if (char !== " ") out.push({ char, angle: at + (i - mid) * step });
   });
   return out;
 }

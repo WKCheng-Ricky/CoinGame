@@ -97,3 +97,61 @@ for (const scheme of ["light", "dark"]) {
     });
   });
 }
+
+test.describe("touch device", () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+
+  test("hover styling is not applied to the mode buttons on touch", async ({ page }) => {
+    await openHome(page);
+    // proves this context exercises the no-hover branch of the media query
+    expect(await page.evaluate(() => matchMedia("(hover: hover)").matches)).toBe(false);
+    const panel = await resolved(page, "--panel");
+    const accent = await resolved(page, "--accent");
+    const tint = await resolved(page, "--accent-tint");
+    for (const sel of MODES) {
+      const before = await style(page, sel);
+      expect(before.bg, sel).toBe(panel);
+      await page.locator(sel).hover(); // moves the pointer over it: must not trigger :hover styling
+      const after = await style(page, sel);
+      expect(after.bg, sel).toBe(before.bg);
+      expect(after.bg, sel).not.toBe(tint);
+      expect(after.border, sel).toBe(before.border);
+      expect(after.border, sel).not.toBe(accent);
+    }
+  });
+
+  test("a passive touchstart listener covers the mode buttons so iOS Safari applies :active", async ({ page }) => {
+    // iOS only applies :active when a touch listener exists on the element or an ancestor
+    await page.addInitScript(() => {
+      window.__touchRegs = [];
+      const orig = EventTarget.prototype.addEventListener;
+      EventTarget.prototype.addEventListener = function (type, fn, opts) {
+        if (type === "touchstart") window.__touchRegs.push({ target: this, passive: !!(opts && opts.passive) });
+        return orig.call(this, type, fn, opts);
+      };
+    });
+    await openHome(page);
+    const covered = await page.evaluate(() => {
+      const btn = document.getElementById("btn-endless");
+      return window.__touchRegs.some((r) => r.passive && r.target.contains && r.target.contains(btn));
+    });
+    expect(covered).toBe(true);
+    // the no-op listener changes nothing: a touchstart neither navigates nor cancels
+    const cancelled = await page.evaluate(() => {
+      const ev = new Event("touchstart", { bubbles: true, cancelable: true });
+      document.getElementById("btn-endless").dispatchEvent(ev);
+      return ev.defaultPrevented;
+    });
+    expect(cancelled).toBe(false);
+    await expect(page.locator("#screen-home")).toBeVisible();
+    // the pressed state still paints the accent fill
+    const accent = await resolved(page, "--accent");
+    const box = await page.locator("#btn-endless").boundingBox();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    expect((await style(page, "#btn-endless")).bg).toBe(accent);
+    await page.mouse.move(2, 2);
+    await page.mouse.up();
+    await expect(page.locator("#screen-home")).toBeVisible();
+  });
+});

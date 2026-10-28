@@ -38,26 +38,28 @@ on real phones.
 
 ## 1. Page layout
 
+[Superseded by 7.1 where it conflicts: the app now lives in a phone-sized frame of at most 433 px; the bars below are flex children of the frame, not `position: sticky`, and there is no `min-height: 100dvh` workaround.]
+
 - **Home (`#screen-home`).** A centred column: heading, text, difficulty box and
   the three mode buttons are all centred horizontally; the column is centred
   vertically with `min-height: 100dvh`. The buttons keep their 16rem width.
-- **Top bar (sticky, game screens only).** `position: sticky; top: 0` with the
+- **Top bar (game screens only).** [Superseded by 7.1: a fixed-height flex child of the frame, not sticky.] `position: sticky; top: 0` with the
   panel background, a bottom border and the top safe-area inset. It holds a
   compact "< Back" button on the left (the existing `#btn-back`, same id), the
   target ("Make £3.95" in about 1.75rem, one line) and the rounds counter. In
   Cashier there is no target; it shows the counter ("Customers served: N"). It
   replaces the large 3.5rem heading in `#play-heading`; the heading element and
   its focus behaviour (`tabindex="-1"`, focused at the start of a round) stay.
-- **Bottom bar (sticky).** `.actions` becomes `position: sticky; bottom: 0` with
+- **Bottom bar.** [Superseded by 6.3 and 7.1: the bottom bar is the `.dock`, a flex child of the frame, not sticky.] `.actions` becomes `position: sticky; bottom: 0` with
   the panel background, a top border and `padding-bottom:
   env(safe-area-inset-bottom)`. It holds Check, Clear, Next, Play again and
   Change amount (as today, shown per mode and state), but not Back. It wraps and
   grows upward only if the width runs out; it never overflows sideways.
-- **Why sticky and not fixed.** Both bars stay in the page flow, so no content can
+- **Why sticky and not fixed.** [Superseded by 7.1: neither; the bars are flex children of the frame.] Both bars stay in the page flow, so no content can
   be hidden behind them and no padding workaround is needed. The viewport meta
   tag gains `viewport-fit=cover` so the safe-area insets take effect.
 - **Custom screen** (`#screen-custom`) keeps its own Start and Back buttons; it
-  is a form, not a game screen, and is not part of the sticky bars.
+  is a form, not a game screen, and is not part of the bars.
 - **Space.** Two bars take about 110 px; the old heading took about 130 px and
   goes away, so the content area on a 667 px screen stays about the same.
 
@@ -210,7 +212,8 @@ on real phones.
   `matchMedia("(prefers-color-scheme: dark)")` change, so the phone's browser
   bar matches whichever theme is showing (media-query `theme-color` tags would
   ignore the override).
-- **Coins.** The metal colours (copper, silver, gold) stay the same in both
+- **Coins.** (Superseded by 7.3: the metals are themed in round 3, and the
+  light-theme edge is `#00000080`; 7.3 also relaxes the 3:1 metal rule to dark only.) The metal colours (copper, silver, gold) stay the same in both
   themes, because they are objects, not UI. Contrast comes from the board: a
   dark pile background and a lighter outer-edge stroke or soft rim glow in dark
   mode so the silver and copper coins and their edge lines stay visible. The
@@ -219,7 +222,7 @@ on real phones.
 - **Grid.** Lines use the themed grid colour, so they stay faint in both modes.
 - **Contrast.** Every text and control colour pair meets WCAG AA (4.5:1 for text,
   3:1 for borders, focus outlines and the theme icon against the page) in both
-  themes.
+  themes. [Amended by 7.3 and 7.8: the 3:1 metal-versus-pile rule applies to dark only.]
 - **Not done.** No theme control on game screens, no high-contrast or other
   themes, no syncing between devices.
 
@@ -256,27 +259,28 @@ size is the one stated in 6.7. Everything else in sections 1 to 5 stands.
     follows is ignored, as the coin code does), so a player can read an option
     without choosing it.
 
-### 6.3 Tray in the sticky bottom bar (Endless and Custom)
+### 6.3 Tray in the bottom bar (Endless and Custom)
 
-- The sticky bottom card becomes `<div class="dock">`, containing, in order: the
+[Superseded by 7.1 and 7.2 where it says sticky, wide screens, one row of eight, 48rem, or that the Cashier field stays in the page flow.]
+
+- The bottom card becomes `<div class="dock">`, containing, in order: the
   result message `#play-message`, the tray `#play-tray`, and the existing
-  `.actions` row (Check, Clear, Next, Play again, Change amount). Only `.dock`
-  is sticky; `.actions` is a plain row inside it.
-- The board holds only the pile area, centred (max about 28rem on wide
-  screens), in all modes. The tray's "Add a coin" heading and its second scale
+  `.actions` row (Check, Clear, Next, Play again, Change amount). `.dock` is a flex child of the frame (7.1,
+  not sticky); `.actions` is a plain row inside it.
+- The board holds only the pile area, centred (max about 28rem; 7.1 caps the frame at 433 px), in all modes. The tray's "Add a coin" heading and its second scale
   note are removed; `#play-tray` gets `role="group"` and `aria-label="Add a
   coin"`, and the one scale note stays under the pile heading (both grids use the
   same square).
-- **Phones (under 48rem):** tray as two rows of four, then the buttons centred
-  below. **Wide screens:** the tray as one row of eight at full scale, and the
-  buttons to its right, in one row.
+- **Tray layout:** two rows of four, then the buttons centred below. [Superseded
+  by 7.1: there is no wide-screen layout; the one-row-of-eight tray exists only
+  in short windows (under 30rem tall).]
 - **Cashier:** no tray (hidden as today), so the dock holds the message and the
-  buttons. The Cashier answer field stays in the page flow.
+  buttons. The Cashier answer field stays in the page flow. [Superseded by 7.2: it is in the dock.]
 - **The result message moves into the dock** so "Too high", "Too low" and the
   success text are always on screen when Check is pressed. Before this change the
   message sat in the page flow above the bar and could be scrolled out of
   view on a short phone.
-- **Height cost (be aware):** on a phone the dock is about 200 to 230 px tall
+- **Height cost (be aware):** on a phone the dock is about 200 to 230 px tall [measured before the frame; 7.1 governs now]
   (message line, two coin rows, buttons). With the top bar the board gets about
   370 px on a 375x667 phone, so on that size the pile may need a small scroll;
   on 360x800 and 393x852 the whole pile fits without scrolling. Dragging a coin
@@ -388,15 +392,18 @@ correct answer, a collapsible tray, and any change to coin art or game rules.
   phone test changes; a jsdom test that `theme-boot.js` leaves no global
   variables.
 - Existing e2e tests that use `.tray-area`, "Add a coin", `.actions` as the
-  sticky bar, `.board` columns or a visible total in Normal are updated to the
+  sticky bar (no longer sticky, see 7.1), `.board` columns or a visible total in Normal are updated to the
   new structure; the coverage gates still apply.
 
 ## 7. Round 3: phone frame, Cashier dock, dark coins, reference lettering, Home feedback
 
 Added after the round 2 implementation was reviewed and tried. Where this
-section conflicts with sections 1 to 6, this section wins: the sticky bars and
-the wide-screen layout are replaced by the frame (7.1), the metals are themed
-(7.3, replacing "same metal colours in both themes" in section 5), the lettering
+section conflicts with sections 1 to 6, this section wins: the sticky bars (1, 6.3), the
+wide-screen layout and 48rem breakpoint (6.3, Out of scope), `min-height: 100dvh`,
+the one-row-on-wide-screens tray and sticky `.dock` (6.3), the Cashier field in
+the page flow (6.3, replaced by 7.2) and the Sticky-bars risk are replaced by
+the frame (7.1), the metals are themed
+(7.3, replacing "same metal colours in both themes" and the 3:1 contrast wording in section 5, and the same-metals test line in 6.6), the lettering
 follows the reference coins (7.4, replacing the small curved wording of section
 4 and the wording numbers of 6.6), and 6.5 is clarified (7.6).
 
@@ -431,8 +438,12 @@ follows the reference coins (7.4, replacing the small curved wording of section
   `main` wider) are removed. The tray is always two rows of four.
 - **Short windows and landscape phones.** The frame takes the window height
   and the content scrolls inside it. A landscape phone (for example 852x393) is
-  a 433 px wide, 393 px tall frame; the pile may need scrolling there. That is
-  accepted and no separate landscape layout is built.
+  a 433 px wide, 393 px tall frame and the pile may need scrolling there. Below
+  30rem of height (`max-height: 30rem`) the bars, message and dock padding shrink
+  and the tray becomes one row of eight at one shared scale (`0.36cqw` per mm, so
+  about half the normal tray scale, with the 44 px tap areas kept), so the dock is
+  about a third of the window and the content area stays above 150 px at 852x393.
+  No separate landscape layout is built.
 - **Constraint.** The frame must not use `transform`, `filter` or `contain:
   paint`, which would break the `position: fixed` tray drag ghost.
 - **Not included (idea for later).** Scaling the frame up on tall screens by
@@ -461,7 +472,7 @@ follows the reference coins (7.4, replacing the small curved wording of section
   `--metal-silver` and `--metal-gold`, each defined like the other theme
   variables (a plain light value in `:root`, a `light-dark()` pair in the
   `@supports` block). Light values are today's colours. Starting dark values:
-  copper `#a0622d`, silver `#9ea5af`, gold `#bf9b30`; the dark `--coin-edge`
+  copper `#a8682f`, silver `#9ea5af`, gold `#bf9b30`; the dark `--coin-edge`
   becomes `#ffffff33`. Final values are tuned by eye with before-and-after
   screenshots.
 - SVG presentation attributes cannot use `var()`, so `coinSvg` emits a class
@@ -469,8 +480,18 @@ follows the reference coins (7.4, replacing the small curved wording of section
   £1/£2 disc, and CSS sets `fill`. The rim line and shine still come from the
   per-coin shade data. `coins.js` gains `metal` (and `discMetal` for the £1 and
   £2) and keeps its light `fill` values for the existing tests.
-- Contrast: each metal against the pile background is at least 3:1 in both
-  themes (this replaces "coins render the same fills in both schemes").
+- Contrast: in the dark theme each metal against the pile background is at
+  least 3:1 (this replaces "coins render the same fills in both schemes"). In
+  the light theme the metal colours are today's and fill-versus-pile is not
+  required to reach 3:1 (silver is about 1.5:1, gold about 2:1, copper about
+  3.6:1 on the cream pile); there the coin is separated from the pile by the
+  coin edge, `#00000080`, which is at least 3:1 against the pile. The dark
+  edge `#ffffff33` is deliberately faint (a bright halo made the coins look
+  like stickers) and measures about 1.9:1, so its test uses the measured
+  minimum of 1.5:1. Dark copper was later tuned to `#a8682f` (about 4.1:1).
+  Spec amendment: this bullet originally required 3:1 for every metal in both
+  themes; it was amended after review to match the implementation, because that
+  cannot hold alongside keeping the light colours unchanged.
 
 ### 7.4 Lettering like the reference coins
 
@@ -570,8 +591,9 @@ other than the theme.
   left to right; the 5p has one straight `coin-word` text and its numeral sits
   below the line (numeral top at least 2 units below the wording's bottom);
   metal classes are present and no `id` appears in any SVG.
-- **Dark coins:** each metal against the pile background is at least 3:1 in both
-  themes; light fills are unchanged; the three metal variables have plain
+- **Dark coins:** each metal against the pile background is at least 3:1 in
+  dark; in light the fills are unchanged and the coin edge is at least 3:1
+  against the pile; the dark edge test uses 1.5:1 (see 7.3); the three metal variables have plain
   fallbacks (the existing stylesheet test covers them).
 - **Review items:** a held Enter on a focused Next presses it once at most; the
   grid layer-order test; `GET /` returns `Cache-Control: no-cache`; the two
@@ -623,7 +645,7 @@ other than the theme.
     contrast ratio of each text/background pair and of each border and focus
     outline against its background in both schemes, asserting at least 4.5:1
     for text and 3:1 for borders and focus. Coins render the same metal colours
-    in both schemes.
+    in both schemes. [Superseded by 7.3: metals are themed.]
   - Existing e2e tests that use `#btn-back` keep working because the id is
     unchanged; those that read `#play-heading` are updated to the new bar.
 - The coverage gates from the test-suite spec still apply and must pass.
@@ -634,13 +656,12 @@ A theme control on the game screens, other themes, saving game state, sound, a s
 page, changing difficulty rules,
 changing game logic or the drag model, accurate reproduction of the Mint's
 reverse artwork or inscriptions, edge details (milling, edge lettering), and
-any tablet layout beyond the existing 48rem breakpoint.
+any tablet or wide-screen layout (the app is a fixed phone-sized frame, 7.1).
 
 ## Risks
 
-- **Sticky bars and on-screen keyboard.** In Cashier the keyboard shrinks the
-  visual viewport; with sticky (not fixed) bars the page just scrolls, but this
-  needs a manual check on a real phone or an emulator.
+- **On-screen keyboard.** [Superseded by 7.1 and 7.2: the bars are no longer
+  sticky; see the round 3 Cashier keyboard and frame risks below.]
 - **Grid in the tray.** Drawing it on a pseudo-element that reads the tray's
   `cqw` is the least certain CSS here; the fallback is a wrapper element that
   carries the container.

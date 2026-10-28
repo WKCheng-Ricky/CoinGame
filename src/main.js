@@ -47,6 +47,10 @@ function initTheme() {
 }
 initTheme();
 
+// iOS Safari only applies :active (the pressed fill on the mode buttons) when a touch
+// listener exists on the element or an ancestor. This one is a deliberate no-op.
+document.querySelector(".stack-col")?.addEventListener("touchstart", () => {}, { passive: true });
+
 const timing = timingFromSearch(location.search);
 
 const dwell = createDwell({

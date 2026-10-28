@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { COINS, coinById } from "../src/coins.js";
 import { coinLabel, coinSvg, faceLayout } from "../src/render.js";
 import { shapeRadiusAt } from "../src/shapes.js";
@@ -50,7 +51,7 @@ test("every coin face has a body, rim, shine and its wording elements", () => {
     assert.equal(classCount(svg, "coin-word"), isStraight(coin) ? 1 : letterCount(coin), coin.id);
     assert.equal(classCount(svg, "coin-label"), 1, coin.id);
     assert.ok(svg.includes(`class="coin-label"`) && svg.includes(`>${coin.label}</text>`), coin.id);
-    assert.equal(classCount(svg, "coin-disc"), coin.ring ? 1 : 0, coin.id);
+    assert.equal(classCount(svg, "coin-disc"), coin.discMetal ? 1 : 0, coin.id);
   }
 });
 
@@ -130,8 +131,10 @@ test("every arc letter clears the rim line and the body edge by at least 0.5 uni
     let worstInner = Infinity, worstOuter = Infinity;
     for (const { r, angle, size } of letters) {
       assert.ok(size >= 3.5 && size <= 8.5 + 1e-9, `${coin.id} font ${size}`);
-      // letters are vertically centred on their radius (dominant-baseline central)
-      const cap = 0.72 * size, hw = 0.4 * size, near = r - cap / 2, far = r + cap / 2;
+      // dominant-baseline central leaves the ink off-centre, measured in Chromium (e2e/lettering.spec.js):
+      // 0.026 em inward for outer letters, 0.037 em outward for upright ones
+      const shift = (coin.wording.flow === "upright" ? 0.037 : -0.026) * size;
+      const cap = 0.72 * size, hw = 0.4 * size, near = r + shift - cap / 2, far = r + shift + cap / 2;
       for (const x of [-hw, -hw / 2, 0, hw / 2, hw]) {
         const inner = Math.hypot(near, x) - (shapeRadiusAt(coin.shape, rim, angle + deg(Math.atan2(x, near))) + 0.5);
         const outer = shapeRadiusAt(coin.shape, 92, angle + deg(Math.atan2(x, far))) - 1.5 - Math.hypot(far, x);
@@ -170,7 +173,7 @@ test("outer letters (everything else) sit above the centre, turned to their angl
   for (const id of ["1p", "2p", "10p", "20p", "£2"]) {
     const svg = coinSvg(coinById(id));
     for (const l of arcLettersOf(svg, "outer")) assert.ok(Math.abs(l.rotate - l.angle) < 1e-9, id);
-    assert.ok(/<text class="coin-word" x="50" y="(?:[0-4]\d(?:\.\d+)?)"/.test(svg), id);
+    assert.ok(/<text class="coin-word" x="50" y="(?:[0-4]?\d(?:\.\d+)?)"/.test(svg), id);
   }
 });
 
@@ -196,7 +199,6 @@ test("the 5p has one straight wording line with a textLength, and its numeral si
 test("faceLayout gives arc coins a radius and font and the 5p none", () => {
   for (const coin of COINS) {
     const layout = faceLayout(coin);
-    assert.equal(layout.rimWidth, 70, coin.id);
     if (isStraight(coin)) assert.equal(layout.font, undefined, coin.id);
     else assert.ok(layout.radius > 34 && layout.radius < 46 && layout.font >= 3.5, coin.id);
   }
@@ -225,6 +227,17 @@ test("the body and the inner disc carry their metal class and no inline metal fi
     } else {
       assert.equal(disc, null, coin.id);
     }
-    assert.ok(!svg.includes(`fill="${coin.fill}"`), `${coin.id} writes the metal as an attribute`);
+    assert.ok(!/\sfill="#/.test(svg.replace(/fill="none"/g, "")), `${coin.id} writes a metal as an attribute`);
   }
+});
+
+test("the lettering and numeral take their ink from the theme, not an inline fill", () => {
+  for (const coin of COINS) {
+    const svg = coinSvg(coin);
+    for (const m of svg.matchAll(/<text [^>]*>/g)) assert.ok(!/\sfill=/.test(m[0]), `${coin.id} text has an inline fill`);
+  }
+  const css = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
+  assert.match(css, /--coin-ink: #222;/);
+  assert.match(css, /--coin-ink: light-dark\(#222, #000\);/);
+  assert.match(css, /\.coin-word, \.coin-label \{ fill: var\(--coin-ink\); \}/);
 });

@@ -12,6 +12,10 @@ const MIN_WORD_SIZE = 3.5;
 const MAX_WORD_SIZE = 8.5;
 const WORD_SPAN = 72; // degrees the wording covers
 const CAP_HEIGHT = 0.72; // capital height as a fraction of the font size
+// With dominant-baseline="central" the capitals' ink centre is not on the text's radius: measured in
+// Chromium at 8 units it sits 0.2 inward for outer letters and 0.3 outward for upright ones (as a fraction
+// of the font size, in the direction away from the coin centre).
+const INK_SHIFT = { outer: -0.026, upright: 0.037 };
 const GLYPH_HALF_WIDTH = 0.4; // half a letter's width as a fraction of the font size
 const SHINE_RADIUS = 35;
 const STRAIGHT_LENGTH = 66; // width of the 5p's straight wording
@@ -30,7 +34,7 @@ export function faceLayout(coin) {
   const { text, at = 0, flow } = coin.wording;
   let layout;
   if (flow === "straight") {
-    layout = { rimWidth: RIM_WIDTH };
+    layout = {};
   } else {
     let radius = 40, font = MAX_WORD_SIZE;
     for (let round = 0; round < 6; round++) {
@@ -42,10 +46,10 @@ export function faceLayout(coin) {
         inner = Math.max(inner, shapeRadiusAt(coin.shape, RIM_WIDTH, a) + RIM_STROKE / 2);
         outer = Math.min(outer, shapeRadiusAt(coin.shape, BODY_WIDTH, a) - BODY_STROKE / 2);
       }
-      radius = (inner + outer) / 2;
+      radius = (inner + outer) / 2 - INK_SHIFT[flow] * font; // centre the real ink, not the text anchor
       font = Math.max(MIN_WORD_SIZE, Math.min(fitFont(text, radius, WORD_SPAN, MAX_WORD_SIZE), (outer - inner - 1.0) / CAP_HEIGHT));
     }
-    layout = { rimWidth: RIM_WIDTH, radius, font };
+    layout = { radius, font };
   }
   layouts.set(coin.id, layout);
   return layout;
@@ -67,7 +71,7 @@ function shineArc(radius) {
   return `M${point(-75)} A${radius},${radius} 0 0 1 ${point(-30)}`;
 }
 
-const WORD_ATTRS = 'text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif" font-weight="600" fill="#222"';
+const WORD_ATTRS = 'text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif" font-weight="600"';
 // W and M are wider than the 0.7 em a letter gets along the arc, so they are squeezed to fit their slot.
 const WIDE_LETTERS = "WM";
 
@@ -88,18 +92,18 @@ function wordingLetters(coin, { radius, font }) {
 export function coinSvg(coin) {
   const layout = faceLayout(coin);
   const body = outlineShape(coin, `coin-body coin-edge metal-${coin.metal}`, BODY_WIDTH, true, BODY_STROKE);
-  const rim = outlineShape(coin, "coin-rim", layout.rimWidth, false, RIM_STROKE, ` stroke="${coin.shade.dark}"`);
+  const rim = outlineShape(coin, "coin-rim", RIM_WIDTH, false, RIM_STROKE, ` stroke="${coin.shade.dark}"`);
   // keep the highlight inside the rim line
   let shineRadius = SHINE_RADIUS;
   for (let angle = -75; angle <= -30; angle += 5) {
-    shineRadius = Math.min(shineRadius, shapeRadiusAt(coin.shape, layout.rimWidth, angle) - 2.5);
+    shineRadius = Math.min(shineRadius, shapeRadiusAt(coin.shape, RIM_WIDTH, angle) - 2.5);
   }
   const shine = `<path class="coin-shine" d="${shineArc(shineRadius)}" fill="none" stroke="${coin.shade.light}" stroke-width="2.5" stroke-linecap="round" opacity="0.9"/>`;
-  const disc = coin.ring
+  const disc = coin.discMetal
     ? `<circle class="coin-disc coin-edge metal-${coin.discMetal}" cx="50" cy="50" r="31" stroke-width="2"/>`
     : "";
   const size = coin.numeralSize ?? (coin.label.length > 2 ? 28 : 34);
-  const label = `<text class="coin-label" x="50" y="${coin.numeralY ?? 50}" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif" font-weight="700" font-size="${size}" fill="#222">${coin.label}</text>`;
+  const label = `<text class="coin-label" x="50" y="${coin.numeralY ?? 50}" text-anchor="middle" dominant-baseline="central" font-family="system-ui, sans-serif" font-weight="700" font-size="${size}">${coin.label}</text>`;
   return `<svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">${body}${rim}${shine}${disc}${wordingLetters(coin, layout)}${label}</svg>`;
 }
 

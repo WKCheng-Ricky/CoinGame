@@ -86,3 +86,29 @@ test("the field and label are hidden in Endless and Custom", async ({ page }) =>
   await expect(page.locator("#cashier-input")).toBeHidden();
   await expect(page.locator('label[for="cashier-input"]')).toBeHidden();
 });
+
+for (const size of [{ width: 375, height: 667 }, { width: 433, height: 771 }]) {
+  test(`${size.width}x${size.height}: the amount field stretches to the dock edge once solved`, async ({ page }) => {
+    await page.setViewportSize(size);
+    await seedRandom(page);
+    await startMode(page, "Cashier");
+    await expect(page.locator("#play-pile-summary")).toHaveText(/^On the counter: /);
+    const sum = await counterTotalPence(page);
+    const edges = () => page.evaluate(() => {
+      const dock = document.querySelector(".dock");
+      const cs = getComputedStyle(dock);
+      const d = dock.getBoundingClientRect();
+      const inner = d.right - parseFloat(cs.borderRightWidth) - parseFloat(cs.paddingRight);
+      const check = document.querySelector("#btn-check").getBoundingClientRect();
+      return { input: document.querySelector("#cashier-input").getBoundingClientRect().right, inner, checkLeft: check.left };
+    });
+    const before = await edges();
+    expect(before.input).toBeLessThan(before.checkLeft);
+    await page.locator("#cashier-input").fill(pounds(sum));
+    await page.locator("#btn-check").click();
+    await expect(page.locator("#btn-check")).toBeHidden();
+    await expect(page.locator("#cashier-input")).toBeDisabled();
+    const after = await edges();
+    expect(Math.abs(after.input - after.inner)).toBeLessThan(2);
+  });
+}

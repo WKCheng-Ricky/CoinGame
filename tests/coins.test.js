@@ -32,18 +32,16 @@ test("only the 5p moves its numeral off the centre, down to y = 72", () => {
   for (const coin of COINS) assert.equal(coin.numeralY, coin.id === "5p" ? 72 : undefined, coin.id);
 });
 
-test("every coin names its metal, and the £1 and £2 name the inner disc's metal; light fills are kept", () => {
-  const METALS = { copper: "#b87333", silver: "#c9ccd1", gold: "#d4af37" };
+test("every coin names its metal, and the £1 and £2 name the inner disc's metal", () => {
+  const METALS = { copper: 1, silver: 1, gold: 1 };
   for (const coin of COINS) {
     assert.ok(coin.metal in METALS, `${coin.id} metal`);
-    assert.equal(coin.fill, METALS[coin.metal], `${coin.id} light fill`);
-    if (coin.ring) {
+    if (coin.discMetal) {
       assert.ok(coin.discMetal in METALS, `${coin.id} discMetal`);
-      assert.equal(coin.ring, METALS[coin.discMetal], `${coin.id} light ring`);
       assert.notEqual(coin.discMetal, coin.metal, coin.id);
     } else {
       assert.equal(coin.discMetal, undefined, coin.id);
     }
   }
-  assert.deepEqual(COINS.filter((c) => c.discMetal).map((c) => [c.id, c.metal, c.discMetal]), [["£1", "gold", "silver"], ["£2", "silver", "gold"]]);
+  assert.deepEqual(COINS.filter((c) => c.discMetal).map((c) => [c.id, c.metal, c.discMetal]), [["£1", "gold", "silver"], ["£2", "gold", "silver"]]);
 });

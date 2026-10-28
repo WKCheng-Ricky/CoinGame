@@ -56,3 +56,16 @@ test("coin bodies take their metal from the theme variables, not from the markup
   expect(fills.silver).toBe("rgb(201, 204, 209)"); // the £1's inner disc
   expect(await page.locator("#play-pile .coin-body").first().getAttribute("fill")).toBeNull();
 });
+
+test("the £1 and £2 both have a gold body around a silver disc, in light and dark", async ({ page }) => {
+  for (const scheme of ["light", "dark"]) {
+    await page.emulateMedia({ colorScheme: scheme });
+    await startMode(page, "Endless");
+    await addCoins(page, ["£1", "£2"]);
+    for (const id of ["£1", "£2"]) {
+      const coin = page.locator(`#play-pile [data-coin="${id}"]`);
+      await expect(coin.locator(".coin-body")).toHaveClass(/metal-gold/);
+      await expect(coin.locator(".coin-disc")).toHaveClass(/metal-silver/);
+    }
+  }
+});

@@ -111,12 +111,11 @@ test("fitFont makes the text span the asked angle unless the font cap is hit", (
   assert.equal(fitFont("TEN PENCE", 40, 72, 6), 6);
 });
 
-test("arcLetters with at: 270 is centred on 270 and runs clockwise, not flipped", () => {
+test("arcLetters with at: 270 is centred on 270 and runs clockwise", () => {
   const letters = arcLetters("ONE PENNY", 40, 7, 270, "outer");
   assert.equal(letters.length, 8);
   assert.ok(Math.abs((letters[0].angle + letters[7].angle) / 2 - 270) < 0.01);
   for (let i = 1; i < letters.length; i++) assert.ok(letters[i].angle > letters[i - 1].angle);
-  assert.ok(letters.every((l) => l.flip === false));
 });
 
 test("upright letters run counter-clockwise from the largest angle so they read left to right along the bottom", () => {
@@ -125,7 +124,6 @@ test("upright letters run counter-clockwise from the largest angle so they read 
   assert.ok(Math.abs((letters[0].angle + letters[9].angle) / 2 - 180) < 0.01);
   assert.ok(letters[0].angle > letters[9].angle);
   for (let i = 1; i < letters.length; i++) assert.ok(letters[i].angle < letters[i - 1].angle);
-  assert.ok(letters.every((l) => l.flip === true));
   // x = sin(angle) increases from the first letter to the last
   const xs = letters.map((l) => Math.sin((l.angle * Math.PI) / 180));
   for (let i = 1; i < xs.length; i++) assert.ok(xs[i] > xs[i - 1]);
@@ -134,7 +132,6 @@ test("upright letters run counter-clockwise from the largest angle so they read 
 test("arcLetters defaults keep the old behaviour (centred on the top, clockwise)", () => {
   const letters = arcLetters("TEN PENCE", 42, 5);
   assert.ok(Math.abs(letters[0].angle + letters[7].angle) < 0.01);
-  assert.equal(letters[0].flip, false);
 });
 
 test("every arc coin's real text spans 60 to 80 degrees at a typical radius", () => {

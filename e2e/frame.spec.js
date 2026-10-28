@@ -119,3 +119,21 @@ test("1440x960: dragging a tray coin to the pile drops it where it was released 
   expect(Math.abs(b.x + b.width / 2 - target.x)).toBeLessThan(6);
   expect(Math.abs(b.y + b.height / 2 - target.y)).toBeLessThan(6);
 });
+
+for (const [screen, w, h] of [
+  ["Cashier", 433, 771], ["Cashier", 375, 667], ["Cashier", 912, 1368], ["Endless", 433, 771],
+]) {
+  test(`${w}x${h} ${screen}: the pile card sits centred between the top bar and the dock (no dead strip)`, async ({ page }) => {
+    await page.setViewportSize({ width: w, height: h });
+    await open(page, screen);
+    const m = await page.evaluate(() => {
+      const r = (s) => document.querySelector(s).getBoundingClientRect();
+      const card = r(".pile-area");
+      return { above: card.top - r(".topbar").bottom, below: r(".dock").top - card.bottom, card: card.height };
+    });
+    const spare = m.above + m.below;
+    expect(Math.abs(m.above - m.below)).toBeLessThanOrEqual(2);
+    expect(m.above).toBeLessThanOrEqual(spare / 2 + 2);
+    expect(m.below).toBeLessThanOrEqual(spare / 2 + 2);
+  });
+}
