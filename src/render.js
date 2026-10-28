@@ -107,7 +107,10 @@ export function coinSvg(coin) {
     ? `<circle class="coin-disc coin-edge metal-${coin.discMetal}" cx="50" cy="50" r="31" stroke-width="2"/>`
     : "";
   const size = coin.numeralSize ?? (coin.label.length > 2 ? 28 : 34);
-  const label = `<text class="coin-label" x="50" y="${coin.numeralY ?? 50}" text-anchor="middle" dominant-baseline="central" font-family="CoinLetters, system-ui, sans-serif" font-weight="700" font-size="${size}">${coin.label}</text>`;
+  const labelY = coin.numeralY ?? 50;
+  // The pile counter-rotates the label about its own centre. The pivot is given in viewBox units because
+  // transform-box: fill-box is unreliable on SVG <text> in WebKit (labels swung off the coin on iOS).
+  const label = `<text class="coin-label" x="50" y="${labelY}" style="transform-origin: 50px ${labelY}px" text-anchor="middle" dominant-baseline="central" font-family="CoinLetters, system-ui, sans-serif" font-weight="700" font-size="${size}">${coin.label}</text>`;
   return `<svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">${body}${rim}${shine}${disc}${wordingLetters(coin, layout)}${label}</svg>`;
 }
 
