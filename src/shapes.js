@@ -28,15 +28,28 @@ export function reuleauxPath(sides, width, cx = 50, cy = 50) {
   return `${d} Z`;
 }
 
-// Angles (degrees clockwise from the top) for each non-space character of a string
-// laid along a circle, centred on the top. Spaces take up room but get no entry.
-export function arcLetters(text, radius, fontSize) {
-  const step = ((fontSize * 0.7) / radius) * (180 / Math.PI);
+const ADVANCE = 0.7; // each character takes this many font sizes along the arc
+
+// Font size that makes `text` (spaces included) span `spanDeg` degrees on a circle of `radius`,
+// measured between the first and last letter's centres, capped at `maxFont`.
+export function fitFont(text, radius, spanDeg = 72, maxFont = 8.5) {
+  const steps = Math.max([...text].length - 1, 1);
+  const font = (((spanDeg * Math.PI) / 180) * radius) / (steps * ADVANCE);
+  return Math.min(font, maxFont);
+}
+
+// Letters of `text` along a circle: `angle` is each non-space letter's position in degrees clockwise
+// from the top, centred on `at`. Spaces take up room but get no entry.
+// "outer" runs clockwise with the tops outward. "upright" is for text along the bottom: it runs
+// counter-clockwise, so the angles fall and it reads left to right, and `flip` marks it for the
+// renderer (which sets the letters upright, tops toward the centre).
+export function arcLetters(text, radius, fontSize, at = 0, flow = "outer") {
+  const step = ((fontSize * ADVANCE) / radius) * (180 / Math.PI) * (flow === "upright" ? -1 : 1);
   const chars = [...text];
   const mid = (chars.length - 1) / 2;
   const out = [];
   chars.forEach((char, i) => {
-    if (char !== " ") out.push({ char, angle: (i - mid) * step });
+    if (char !== " ") out.push({ char, angle: at + (i - mid) * step, flip: flow === "upright" });
   });
   return out;
 }

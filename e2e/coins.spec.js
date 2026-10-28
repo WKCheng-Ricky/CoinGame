@@ -43,3 +43,16 @@ test("a pile coin turns with its --rot while its numeral stays upright; tray coi
     await expect(svg).toHaveCSS("transform", "none");
   }
 });
+
+test("coin bodies take their metal from the theme variables, not from the markup", async ({ page }) => {
+  await startMode(page, "Endless");
+  await addCoins(page, ["1p", "£1"]);
+  const fills = await page.evaluate(() => Object.fromEntries(["copper", "silver", "gold"].map((m) => {
+    const el = document.querySelector(`#play-pile .metal-${m}`);
+    return [m, el ? getComputedStyle(el).fill : null];
+  })));
+  expect(fills.copper).toBe("rgb(184, 115, 51)");
+  expect(fills.gold).toBe("rgb(212, 175, 55)");
+  expect(fills.silver).toBe("rgb(201, 204, 209)"); // the £1's inner disc
+  expect(await page.locator("#play-pile .coin-body").first().getAttribute("fill")).toBeNull();
+});

@@ -391,6 +391,195 @@ correct answer, a collapsible tray, and any change to coin art or game rules.
   sticky bar, `.board` columns or a visible total in Normal are updated to the
   new structure; the coverage gates still apply.
 
+## 7. Round 3: phone frame, Cashier dock, dark coins, reference lettering, Home feedback
+
+Added after the round 2 implementation was reviewed and tried. Where this
+section conflicts with sections 1 to 6, this section wins: the sticky bars and
+the wide-screen layout are replaced by the frame (7.1), the metals are themed
+(7.3, replacing "same metal colours in both themes" in section 5), the lettering
+follows the reference coins (7.4, replacing the small curved wording of section
+4 and the wording numbers of 6.6), and 6.5 is clarified (7.6).
+
+### 7.1 Phone-sized frame
+
+- **Problem.** At 1440x960 the bars stretched to 864 px wide while the pile card
+  stayed a small centred square, with about 300 px of dead space between the pile
+  and the bottom bar. The design is phone-shaped, so the app is held in a phone
+  shaped frame on every screen size.
+- **Frame.** `main` is the frame: `width: min(100%, 433px)`, `height:
+  min(100dvh, 771px)`, centred horizontally and vertically on the page, as a
+  flex column that does not scroll itself. 433 is chosen because the pile is
+  376 px wide at full coin scale and 433 leaves exactly the padding to hold it.
+  The numbers are two CSS variables, `--frame-w: 433px` and `--frame-h: 771px`.
+  The page itself never scrolls (`html, body` do not overflow).
+- **Screens.** Home, Custom and Play all live in the frame. On Play the frame
+  is: top bar (fixed height), a content area that fills the rest and scrolls
+  inside the frame when it must, and the dock (fixed at the bottom of the
+  frame). The bars are ordinary flex children, so no `position: sticky`, no
+  `scroll-padding` and no `min-height` workarounds remain, and there is no gap
+  between content and dock.
+- **Look.** On a viewport wider than the frame (more than 433 px) the frame is a
+  rounded, bordered card with a soft shadow on the page background, like a
+  device. On a phone (433 px or narrower) it is full-bleed with no border or
+  rounding.
+- **Safe areas.** The frame pads all four sides with
+  `max(<normal padding>, env(safe-area-inset-*))`, which also fixes landscape
+  cut-outs. The viewport meta keeps `viewport-fit=cover` and adds
+  `interactive-widget=resizes-content`.
+- **One layout.** Because the frame is always phone-shaped, the wide-screen rules
+  (`min-width: 48rem`: tray in one row, dock as a row, two-column board,
+  `main` wider) are removed. The tray is always two rows of four.
+- **Short windows and landscape phones.** The frame takes the window height
+  and the content scrolls inside it. A landscape phone (for example 852x393) is
+  a 433 px wide, 393 px tall frame; the pile may need scrolling there. That is
+  accepted and no separate landscape layout is built.
+- **Constraint.** The frame must not use `transform`, `filter` or `contain:
+  paint`, which would break the `position: fixed` tray drag ghost.
+- **Not included (idea for later).** Scaling the frame up on tall screens by
+  changing the root font size, since the layout is mostly `rem`.
+
+### 7.2 Cashier input in the dock
+
+- In Cashier the dock holds, top to bottom: the result message `#play-message`,
+  `#cashier-error` (directly under it, taking no height when empty), then a
+  small label "Total (£)" above one row with the amount field `#cashier-input`
+  (flexible width) and the Check button on its right. After a correct answer
+  Check becomes Next and the field is locked, as before.
+- `#cashier-answer` moves from the page flow into the dock; it is hidden outside
+  Cashier. Enter in the field still checks. Nothing else about Cashier changes.
+- On-screen keyboard: with `interactive-widget=resizes-content` Chrome and
+  Firefox on Android shrink the frame so the dock stays above the keyboard. iOS
+  Safari does not support it and pans the page instead; this needs a manual check
+  on a real phone and is listed under Risks.
+
+### 7.3 Themed metal colours (dark-mode coins)
+
+- **Diagnosis.** In dark mode the coins use the light theme's full-brightness
+  silver (`#c9ccd1`) and copper, flat, with a pale `#ffffff66` edge, on a
+  near-black pile. They look like bright stickers with a halo.
+- **Fix.** The metal fills become themed CSS variables, `--metal-copper`,
+  `--metal-silver` and `--metal-gold`, each defined like the other theme
+  variables (a plain light value in `:root`, a `light-dark()` pair in the
+  `@supports` block). Light values are today's colours. Starting dark values:
+  copper `#a0622d`, silver `#9ea5af`, gold `#bf9b30`; the dark `--coin-edge`
+  becomes `#ffffff33`. Final values are tuned by eye with before-and-after
+  screenshots.
+- SVG presentation attributes cannot use `var()`, so `coinSvg` emits a class
+  per metal (`metal-copper`, `metal-silver`, `metal-gold`) on the body and the
+  £1/£2 disc, and CSS sets `fill`. The rim line and shine still come from the
+  per-coin shade data. `coins.js` gains `metal` (and `discMetal` for the £1 and
+  £2) and keeps its light `fill` values for the existing tests.
+- Contrast: each metal against the pile background is at least 3:1 in both
+  themes (this replaces "coins render the same fills in both schemes").
+
+### 7.4 Lettering like the reference coins
+
+Reference images are in `docs/ref/`. Read from them: the wording follows the rim
+and spans about one fifth of it (about 72 degrees), in much larger letters than
+before, placed where the shield leaves a blank strip. Artwork is not reproduced;
+only the position, direction and size of the wording.
+
+| Coin | Centre of the text (degrees clockwise from the top) | Direction |
+|---|---|---|
+| 2p, 10p | 0 (top) | tops outward, reads clockwise |
+| 1p | 270 (left) | tops outward, reads clockwise |
+| 20p | 90 (right) | tops outward, reads clockwise |
+| £2 | 300 (upper left, on the gold ring) | tops outward, reads clockwise |
+| 50p, £1 | 180 (bottom) | upright, tops toward the centre, reads left to right |
+| 5p | across the middle | straight horizontal line, no curve |
+
+- **Data.** Each `coins.js` entry's `wording` becomes `{ text, at, flow }` with
+  `flow` one of `"outer"`, `"upright"` or `"straight"` (`at` unused for
+  `"straight"`).
+- **Arc coins.** The font is chosen so the text spans about 72 degrees, limited
+  by the band: the rim line moves in to a width of 70 units, the letters are
+  at most 8.5 units and their cap height (0.72 of the font size) clears both the
+  rim line and the body edge by at least 0.5 units, measured at each letter's own
+  angle against the real outline (circle, Reuleaux heptagon or 12-gon). Letters
+  stay per-letter `<text class="coin-word">` with no `id` and no `textPath`.
+  `"upright"` letters are rotated 180 degrees extra and run counter-clockwise so
+  they read left to right along the bottom.
+- **5p.** "FIVE PENCE" is one `<text class="coin-word">` centred on the coin,
+  about 66 units wide (`textLength`), turning with the coin like the other
+  wording. The centre is where the numeral shows, so the 5p's numeral moves down
+  to a fixed spot in the lower half (about y = 72 in the coin's own frame). It
+  keeps its counter-rotation, so it stays upright, and because it sits at a fixed
+  offset on one side of the line it cannot overlap the wording at any rotation.
+- Wording stays visible in both difficulties, as decided in section 4.
+- The tray and pile scale are unchanged; at tray size the lettering is still only
+  a few pixels tall.
+
+### 7.5 Home buttons: feedback and selected state
+
+- **Mode buttons.** Endless was green (`primary`), which looked like a selected
+  default. Endless, Custom and Cashier become the same neutral style, because
+  none is "selected": each starts a game. Feedback: on hover (inside
+  `@media (hover: hover)`, so a tap on a phone does not leave a stuck hover) an
+  accent border and a light tint; while pressed (touch and mouse) an accent fill;
+  keyboard focus keeps the existing ring.
+- **Difficulty.** The checked option also gets an accent border, a light tint and
+  bold text (`label:has(input:checked)`), so the choice is clear at a glance,
+  not only from the small radio dot. Browsers without `:has()` keep the radio dot.
+- Check in the dock stays green: it is the one primary action there.
+
+### 7.6 Items from the round 2 review
+
+- **Held Enter.** A held Enter or Space never repeat-activates a button on the
+  play screen (`keydown` with `repeat` is default-prevented there). Focus still
+  moves to Next or Play again after a solve, for keyboard users. This clarifies
+  6.5: the Enter shortcut never advances to the next round, but a deliberate new
+  Enter press on a focused Next button activates it like any button; a held key
+  cannot skip the result.
+- **Grid major lines in light.** The every-fifth-line layers are listed first in
+  `background-image` (painted on top) and use `--grid-major`; a test checks the
+  computed layer order and sizes. (In round 2 the opaque minor lines hid the
+  major ones in the light theme.)
+- **`npm start`.** `package.json` gets `"start": "node e2e/serve.js"`, the server
+  sends `Cache-Control: no-cache` and reads `PORT` (default 4173); the README
+  tells users to use it, notes that `python3 -m http.server` can leave a browser
+  with a stale `main.js`, and to hard-refresh (Ctrl+Shift+R) after pulling. (A
+  stale cached `main.js` with the newer `index.html` left the Home buttons dead.)
+- **Weak tests.** The "labels do not wrap" and "Enter does nothing on Home"
+  tests are rewritten so they can fail.
+
+### 7.7 Out of scope
+
+Scaling the frame, a landscape layout, a Surface-style two-pane layout,
+changing game rules, reproducing the Mint's artwork, and any persisted state
+other than the theme.
+
+### 7.8 Testing
+
+- **e2e, frame:** at 433x771, 375x667, 360x800, 393x852, 1440x960, 912x1368 and
+  852x393 the frame is `min(viewport, 433x771)`, centred when the viewport is
+  larger, the page does not scroll (`scrollHeight <= innerHeight`), the top bar
+  and dock are inside the frame and the viewport, and the content area plus the
+  two bars fill the frame (no gap). At 433x771 the Endless pile card and the
+  whole Home screen are visible without scrolling. Frame decoration (radius,
+  border) appears only above 433 px wide.
+- **e2e, Cashier:** `#cashier-input` and `#cashier-error` are inside the dock and
+  in the viewport at the three phone sizes; Check and Enter still check; after a
+  solve Next appears and the field is locked; the old in-flow field is gone.
+- **e2e, Home feedback:** at rest none of the three mode buttons is accent
+  filled; hover (with `hasHover`) and pressed states change the computed style;
+  the checked difficulty has the accent border and bold text; Check is still
+  green.
+- **Unit and jsdom, coins:** each coin's wording data matches the table; the
+  arc letters span 60 to 80 degrees; every letter clears the rim line and body
+  edge by at least 0.5 units (reusing `shapeRadiusAt`); upright letters run
+  left to right; the 5p has one straight `coin-word` text and its numeral sits
+  below the line (numeral top at least 2 units below the wording's bottom);
+  metal classes are present and no `id` appears in any SVG.
+- **Dark coins:** each metal against the pile background is at least 3:1 in both
+  themes; light fills are unchanged; the three metal variables have plain
+  fallbacks (the existing stylesheet test covers them).
+- **Review items:** a held Enter on a focused Next presses it once at most; the
+  grid layer-order test; `GET /` returns `Cache-Control: no-cache`; the two
+  rewritten tests.
+- Existing e2e tests that use wide viewports, `.dock` as sticky, the page's
+  scroll position, or `#cashier-answer` in the page flow are updated; the
+  coverage gates still apply.
+
 ## Testing
 
 - **jsdom, `theme.js`:** `readTheme` returns `"light"`, `"dark"` or `"auto"`
@@ -470,3 +659,13 @@ any tablet layout beyond the existing 48rem breakpoint.
 - **Silver on dark.** The silver coins and their rim lines are the least likely
   to read against the dark board; the edge stroke or glow is tuned by eye at
   desktop zoom and on a phone-sized viewport, not only by the contrast test.
+- **Cashier on-screen keyboard (round 3).** With the amount field in the dock,
+  Android Chrome and Firefox use `interactive-widget=resizes-content` to keep the
+  dock above the keyboard, but iOS Safari ignores it and pans the page instead.
+  This is not testable in Chromium; it needs a manual check on a real iPhone,
+  and if the dock is hidden there the fallback is to move the field above the
+  dock only while it has focus.
+- **Frame and fixed ghost (round 3).** The tray drag ghost is `position: fixed`
+  on `<body>`; the frame must not create a containing block for it (no
+  `transform`, `filter` or `contain: paint`). A drag test at a centred frame
+  (1440x960) pins this.

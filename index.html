@@ -2,7 +2,7 @@
 <html lang="en-GB">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
   <title>Coin Game</title>
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#f6f3ec">
@@ -30,7 +30,7 @@
       <fieldset class="choice">
         <legend>Choose a game</legend>
         <div class="stack-col">
-          <button id="btn-endless" class="primary">Endless</button>
+          <button id="btn-endless">Endless</button>
           <button id="btn-custom">Custom</button>
           <button id="btn-cashier">Cashier</button>
         </div>
@@ -58,22 +58,24 @@
           <p id="play-rounds" class="rounds" hidden></p>
         </div>
       </header>
-      <div class="board">
-        <div class="pile-area">
-          <h2 id="pile-heading">Your coins</h2>
-          <p class="scale-note">1 square = 1 cm on a real coin</p>
-          <div id="play-pile" class="pile"></div>
-          <p id="play-pile-summary" class="sr-only"></p>
-          <p id="play-total" class="total" aria-live="polite"></p>
+      <div class="content">
+        <div class="board">
+          <div class="pile-area">
+            <h2 id="pile-heading">Your coins</h2>
+            <p class="scale-note">1 square = 1 cm on a real coin</p>
+            <div id="play-pile" class="pile"></div>
+            <p id="play-pile-summary" class="sr-only"></p>
+            <p id="play-total" class="total" aria-live="polite"></p>
+          </div>
         </div>
-      </div>
-      <div id="cashier-answer" class="cashier-answer" hidden>
-        <label for="cashier-input">Total on the counter (£)</label>
-        <input id="cashier-input" type="text" inputmode="decimal" autocomplete="off" aria-describedby="cashier-error" placeholder="3.95">
-        <p id="cashier-error" class="error" role="alert"></p>
       </div>
       <div class="dock">
         <p id="play-message" class="message" aria-live="polite"></p>
+        <div id="cashier-answer" class="cashier-answer" hidden>
+          <p id="cashier-error" class="error" role="alert"></p>
+          <label for="cashier-input">Total (£)</label>
+          <input id="cashier-input" type="text" inputmode="decimal" autocomplete="off" aria-describedby="cashier-error" placeholder="3.95">
+        </div>
         <div id="play-tray" class="tray" role="group" aria-label="Add a coin"></div>
         <div class="row actions">
           <button id="btn-check" class="primary" aria-keyshortcuts="Enter" title="Check (Enter)">Check</button>

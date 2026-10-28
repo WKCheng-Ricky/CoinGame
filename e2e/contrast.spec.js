@@ -66,13 +66,27 @@ const MEASURE = () => {
       out.push({ label: `${label} (outline shown)`, kind: "outline", style: cs.outlineStyle, width: parseFloat(cs.outlineWidth) });
       out.push({ label, kind: "border", ratio: ratio(over(parse(getComputedStyle(el).outlineColor), around), around) });
     },
-    coinEdge(coinId) {
+    // min: the edge is a thin soft outline; in dark it is deliberately faint (a bright halo made the coins
+    // look like stickers), and the coin is identified by its metal fill, checked at 3:1 in its own test
+    coinEdge(coinId, min = 3) {
       const pile = document.querySelector("#play-pile");
       const body = pile.querySelector(`[data-coin="${coinId}"] .coin-body`);
       const bg = background(pile);
-      out.push({ label: `${coinId} edge on the pile`, kind: "border", ratio: ratio(over(parse(getComputedStyle(body).stroke), bg), bg) });
+      out.push({ label: `${coinId} edge on the pile`, kind: "border", min, ratio: ratio(over(parse(getComputedStyle(body).stroke), bg), bg) });
     },
-    fills: () => [...document.querySelectorAll("#play-pile .coin-body, #play-pile .coin-disc")].map((el) => getComputedStyle(el).fill).join("|"),
+    // the resolved fill of each metal on the pile, and its contrast against the pile's own background
+    metalFills() {
+      const pile = document.querySelector("#play-pile");
+      const bg = background(pile);
+      const fills = {}, ratios = {};
+      for (const metal of ["copper", "silver", "gold"]) {
+        const el = pile.querySelector(`.metal-${metal}`);
+        if (!el) continue;
+        fills[metal] = getComputedStyle(el).fill;
+        ratios[metal] = ratio(over(parse(fills[metal]), bg), bg);
+      }
+      return { fills, ratios };
+    },
     results: () => out,
   };
 };
@@ -86,7 +100,7 @@ function assertAll(results) {
   // a focus ring must really be drawn: a visible style and at least 2px
   const hidden = results.filter((r) => r.kind === "outline" && (r.style === "none" || !(r.width >= 2)));
   expect(hidden, `focus outline not visible: ${JSON.stringify(hidden)}`).toEqual([]);
-  const bad = results.filter((r) => r.kind !== "outline" && r.ratio < (r.kind === "text" ? 4.5 : 3));
+  const bad = results.filter((r) => r.kind !== "outline" && r.ratio < (r.min ?? (r.kind === "text" ? 4.5 : 3)));
   expect(bad, `low contrast: ${JSON.stringify(bad)}`).toEqual([]);
 }
 
@@ -106,6 +120,24 @@ for (const scheme of ["light", "dark"]) {
       await page.keyboard.press("Tab");
       const focus = await page.evaluate(`(() => { const m = (${MEASURE.toString()})(); m.focus(document.activeElement, "home focus"); return m.results(); })()`);
       assertAll(focus);
+    });
+
+    test("Home: hovered, pressed and checked states keep their text readable", async ({ page }) => {
+      await page.goto("/?" + FAST);
+      // the checked difficulty label is bold ink on the accent tint
+      assertAll(await measure(page, (m) => m.text("label:has(input:checked)", "checked difficulty label")));
+      await page.locator("#diff-easy").check();
+      assertAll(await measure(page, (m) => m.text("label:has(input:checked)", "checked difficulty label (Easy)")));
+      for (const sel of ["#btn-endless", "#btn-custom", "#btn-cashier"]) {
+        await page.locator(sel).hover();
+        assertAll(await measure(page, (m) => m.text(".stack-col button", "hovered mode button")));
+        const box = await page.locator(sel).boundingBox();
+        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+        await page.mouse.down();
+        assertAll(await measure(page, (m) => m.text(".stack-col button", "pressed mode button")));
+        await page.mouse.move(2, 2);
+        await page.mouse.up();
+      }
     });
 
     test("Home: theme button icon and focus ring", async ({ page }) => {
@@ -147,7 +179,8 @@ for (const scheme of ["light", "dark"]) {
       assertAll(await page.evaluate(`(() => { const m = (${MEASURE.toString()})(); m.focus(document.activeElement, "bar button focus"); return m.results(); })()`));
       for (const id of ["1p", "5p", "20p"]) await page.locator(`#play-tray [data-coin="${id}"]`).click();
       await expect(page.locator("#play-pile .pile-coin")).toHaveCount(3);
-      assertAll(await measure(page, (m) => { m.coinEdge("1p"); m.coinEdge("5p"); m.coinEdge("20p"); }));
+      const min = scheme === "dark" ? 1.5 : 3;
+      assertAll(await measure(page, `(m) => { for (const id of ["1p", "5p", "20p"]) m.coinEdge(id, ${min}); }`));
     });
 
     test("Cashier: input, label and error contrast", async ({ page }) => {
@@ -169,16 +202,24 @@ for (const scheme of ["light", "dark"]) {
   });
 }
 
-test("coins render the same fills in both themes", async ({ page }) => {
-  const fills = {};
+test("each metal is at least 3:1 against the pile in dark; in light the fills are unchanged and the 3:1 edge outlines them", async ({ page }) => {
+  const LIGHT = { copper: "rgb(184, 115, 51)", silver: "rgb(201, 204, 209)", gold: "rgb(212, 175, 55)" };
   for (const scheme of ["light", "dark"]) {
     await page.emulateMedia({ colorScheme: scheme });
     await page.goto("/?" + FAST);
     await page.getByRole("button", { name: "Endless", exact: true }).click();
     for (const id of ["1p", "5p", "£1", "£2"]) await page.locator(`#play-tray [data-coin="${id}"]`).click();
     await expect(page.locator("#play-pile .pile-coin")).toHaveCount(4);
-    fills[scheme] = await page.evaluate(() => [...document.querySelectorAll("#play-pile .coin-body, #play-pile .coin-disc")].map((el) => getComputedStyle(el).fill).join("|"));
+    const m = await page.evaluate(`(() => { const m = (${MEASURE.toString()})(); return m.metalFills(); })()`);
+    for (const metal of ["copper", "silver", "gold"]) {
+      expect(m.fills[metal], `${scheme} ${metal} fill`).toBeTruthy();
+      // The light silver and gold are pale by design (the light fills must stay as they were: 1.5:1 and 1.9:1
+      // against the cream pile), so in light the coin is identified by its 3:1 edge line (see the edge test).
+      if (scheme === "dark") expect(m.ratios[metal], `dark ${metal} against the pile`).toBeGreaterThanOrEqual(3);
+      else expect(m.fills[metal]).toBe(LIGHT[metal]);
+    }
+    // the disc and body of the two-metal coins really use the themed metals
+    expect(m.fills.copper).not.toBe(m.fills.silver);
+    expect(m.fills.silver).not.toBe(m.fills.gold);
   }
-  expect(fills.light).toBe(fills.dark);
-  expect(fills.light.length).toBeGreaterThan(10);
 });

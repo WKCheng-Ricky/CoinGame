@@ -137,24 +137,10 @@ test("the tray is a dashed box like the pile and its grid fills the whole box", 
     const s = getComputedStyle(el, "::before");
     return {
       w: parseFloat(s.width), h: parseFloat(s.height), cw: el.clientWidth, ch: el.clientHeight,
-      cell: parseFloat(s.backgroundSize.split(" ")[0]),
+      cell: parseFloat(s.backgroundSize.split(",")[2].trim().split(" ")[0]), // the minor (1 cm) layer is third
     };
   });
   expect(Math.abs(m.w - m.cw)).toBeLessThan(1);
   expect(Math.abs(m.h - m.ch)).toBeLessThan(1);
   near(m.cell, ((await width(page, '#play-tray [data-coin="1p"] svg')) * 10) / 20.3, 0.02);
-});
-
-test("wide screens: one row of eight with the buttons to the right of the tray", async ({ page }) => {
-  await page.setViewportSize({ width: 1280, height: 720 });
-  await startMode(page, "Endless");
-  const m = await page.evaluate(() => {
-    const boxes = [...document.querySelectorAll("#play-tray .coin")].map((el) => el.getBoundingClientRect());
-    const tray = document.querySelector("#play-tray").getBoundingClientRect();
-    const actions = document.querySelector(".dock .actions").getBoundingClientRect();
-    return { mids: boxes.map((r) => r.top + r.height / 2), tray, actions };
-  });
-  expect(m.mids).toHaveLength(8);
-  expect(Math.max(...m.mids) - Math.min(...m.mids)).toBeLessThan(4);
-  expect(m.actions.left).toBeGreaterThanOrEqual(m.tray.right - 1);
 });

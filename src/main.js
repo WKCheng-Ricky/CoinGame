@@ -371,6 +371,11 @@ document.addEventListener("keydown", (e) => {
   e.preventDefault();
   runCheck();
 });
+// A held Enter or Space must not repeat-activate a button: Enter held to Check would otherwise carry on
+// into the Next that focus moves to after the solve, and skip the result.
+$("screen-play").addEventListener("keydown", (e) => {
+  if (e.repeat && (e.key === "Enter" || e.key === " ")) e.preventDefault();
+}, true);
 $("btn-next").addEventListener("click", () => {
   if (!canAdvance(state, performance.now(), timing.advanceDelayMs)) return;
   if (state.mode === "cashier") {

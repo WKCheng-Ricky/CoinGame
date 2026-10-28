@@ -29,15 +29,43 @@ test("each mode button still opens its mode on one click", async ({ page }) => {
   await expect(page.locator("#cashier-input")).toBeVisible();
 });
 
-test("the difficulty labels read Normal and Easy and do not wrap at 320x640", async ({ page }) => {
+// Number of text lines a label's text occupies, read from its rendered rectangles.
+const lineCount = (label) => label.evaluate((el) => {
+  // only the label's text (not its radio): one rectangle per line box it occupies
+  const rects = [];
+  for (const node of el.childNodes) {
+    if (node.nodeType !== Node.TEXT_NODE || !node.textContent.trim()) continue;
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    rects.push(...range.getClientRects());
+  }
+  const tops = new Set(rects.filter((r) => r.width > 0).map((r) => Math.round(r.top / 4)));
+  return tops.size;
+});
+const lineHeightOf = (label) => label.evaluate((el) => {
+  const s = getComputedStyle(el);
+  return s.lineHeight === "normal" ? 1.2 * parseFloat(s.fontSize) : parseFloat(s.lineHeight);
+});
+
+test("the difficulty labels read Normal and Easy and each is one line high at 320x640", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 640 });
   await openHome(page);
   const labels = page.locator("fieldset.difficulty label");
   await expect(labels).toHaveText(["Normal", "Easy"]);
   for (const label of await labels.all()) {
+    expect(await lineCount(label)).toBe(1);
+    // the label (text plus its radio) is no taller than the 44px tap target allows for one line
+    const lineHeight = await lineHeightOf(label);
     const height = await label.evaluate((el) => el.getBoundingClientRect().height);
-    expect(height).toBeLessThan(50);
+    expect(height).toBeLessThan(2 * lineHeight);
   }
+  // control: the same check does fail for text that wraps
+  const wrapped = await labels.first().evaluate((el) => {
+    el.lastChild.textContent = " Normal and a good many more words besides"; // too long for one line
+    return el.getBoundingClientRect().height;
+  });
+  expect(await lineCount(labels.first())).toBeGreaterThan(1);
+  expect(wrapped).toBeGreaterThanOrEqual(2 * (await lineHeightOf(labels.first())));
 });
 
 test("each difficulty label has a title and a described-by text", async ({ page }) => {

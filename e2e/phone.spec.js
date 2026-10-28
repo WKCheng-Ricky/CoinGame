@@ -33,7 +33,7 @@ async function noHorizontalOverflow(page) {
 
 for (const phone of PHONES) {
   for (const mode of ["endless", "custom", "custom-solved", "cashier"]) {
-    test(`${phone.name} ${phone.width}x${phone.height}: ${mode} keeps bars on screen`, async ({ page }) => {
+    test(`${phone.name} ${phone.width}x${phone.height}: ${mode} keeps bars on screen while the content scrolls`, async ({ page }) => {
       await page.setViewportSize({ width: phone.width, height: phone.height });
       await openMode(page, mode);
       await expect(page.locator(".topbar")).toBeInViewport({ ratio: 1 });
@@ -41,10 +41,12 @@ for (const phone of PHONES) {
       for (const btn of await page.locator(".dock button:visible").all()) {
         await expect(btn).toBeInViewport({ ratio: 1 });
       }
-      const scrollable = await page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight);
-      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight / 2));
-      // where the page is taller than the screen it must really have scrolled, or this check proves nothing
-      if (scrollable) expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+      // the page itself never scrolls; only the content area does, and the top bar stays put
+      expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBe(true);
+      const scrollable = await page.locator(".content").evaluate((el) => el.scrollHeight > el.clientHeight);
+      await page.locator(".content").evaluate((el) => el.scrollTo(0, el.scrollHeight / 2));
+      // where the content is taller than its area it must really have scrolled, or this check proves nothing
+      if (scrollable) expect(await page.locator(".content").evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
       await expect(page.locator("#play-heading")).toBeInViewport();
       await noHorizontalOverflow(page);
     });
@@ -59,17 +61,18 @@ test("320x640: no horizontal overflow in any mode", async ({ page }) => {
   }
 });
 
-test("Cashier: the focused input is not hidden behind a sticky bar", async ({ page }) => {
+test("Cashier: the focused input is inside the dock, clear of the top bar", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 667 });
   await openMode(page, "cashier");
   await page.locator("#cashier-input").focus();
+  await expect(page.locator(".dock #cashier-input")).toBeInViewport({ ratio: 1 });
   const r = await page.evaluate(() => {
     const box = (sel) => document.querySelector(sel).getBoundingClientRect();
-    return { input: box("#cashier-input"), top: box(".topbar"), actions: box(".dock") };
+    return { input: box("#cashier-input"), top: box(".topbar"), dock: box(".dock") };
   });
-  const overlaps = (a, b) => a.top < b.bottom && b.top < a.bottom && a.left < b.right && b.left < a.right;
-  expect(overlaps(r.input, r.top)).toBe(false);
-  expect(overlaps(r.input, r.actions)).toBe(false);
+  const inside = (a, b) => a.top >= b.top && a.bottom <= b.bottom && a.left >= b.left && a.right <= b.right;
+  expect(inside(r.input, r.dock)).toBe(true);
+  expect(r.input.top).toBeGreaterThanOrEqual(r.top.bottom);
 });
 
 for (const vp of [{ width: 390, height: 844 }, { width: 1280, height: 720 }]) {

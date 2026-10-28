@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { arcLetters, polygonPoints, reuleauxPath, shapeRadiusAt } from "../src/shapes.js";
+import { COINS } from "../src/coins.js";
+import { arcLetters, fitFont, polygonPoints, reuleauxPath, shapeRadiusAt } from "../src/shapes.js";
 
 const WIDTH = 92;
 const R = WIDTH / 2 / Math.cos(Math.PI / 14);
@@ -95,4 +96,52 @@ test("shapeRadiusAt scales with the width and agrees with the drawn path's verti
 
 test("shapeRadiusAt rejects an unknown shape", () => {
   assert.throws(() => shapeRadiusAt("pentagon", 92, 0));
+});
+
+test("fitFont makes the text span the asked angle unless the font cap is hit", () => {
+  const spanDeg = (text, radius, font) => ((([...text].length - 1) * 0.7 * font) / radius) * (180 / Math.PI);
+  for (const [text, radius] of [["TWENTY PENCE", 40], ["FIFTY PENCE", 38], ["TWO POUNDS", 41]]) {
+    const font = fitFont(text, radius);
+    assert.ok(font < 8.5, text);
+    assert.ok(Math.abs(spanDeg(text, radius, font) - 72) < 0.01, text);
+    assert.ok(Math.abs(spanDeg(text, radius, fitFont(text, radius, 60)) - 60) < 0.01, text);
+  }
+  // a short text would need a huge font: it is capped
+  assert.equal(fitFont("TEN PENCE", 40), 8.5);
+  assert.equal(fitFont("TEN PENCE", 40, 72, 6), 6);
+});
+
+test("arcLetters with at: 270 is centred on 270 and runs clockwise, not flipped", () => {
+  const letters = arcLetters("ONE PENNY", 40, 7, 270, "outer");
+  assert.equal(letters.length, 8);
+  assert.ok(Math.abs((letters[0].angle + letters[7].angle) / 2 - 270) < 0.01);
+  for (let i = 1; i < letters.length; i++) assert.ok(letters[i].angle > letters[i - 1].angle);
+  assert.ok(letters.every((l) => l.flip === false));
+});
+
+test("upright letters run counter-clockwise from the largest angle so they read left to right along the bottom", () => {
+  const letters = arcLetters("FIFTY PENCE", 40, 7, 180, "upright");
+  assert.equal(letters.length, 10);
+  assert.ok(Math.abs((letters[0].angle + letters[9].angle) / 2 - 180) < 0.01);
+  assert.ok(letters[0].angle > letters[9].angle);
+  for (let i = 1; i < letters.length; i++) assert.ok(letters[i].angle < letters[i - 1].angle);
+  assert.ok(letters.every((l) => l.flip === true));
+  // x = sin(angle) increases from the first letter to the last
+  const xs = letters.map((l) => Math.sin((l.angle * Math.PI) / 180));
+  for (let i = 1; i < xs.length; i++) assert.ok(xs[i] > xs[i - 1]);
+});
+
+test("arcLetters defaults keep the old behaviour (centred on the top, clockwise)", () => {
+  const letters = arcLetters("TEN PENCE", 42, 5);
+  assert.ok(Math.abs(letters[0].angle + letters[7].angle) < 0.01);
+  assert.equal(letters[0].flip, false);
+});
+
+test("every arc coin's real text spans 60 to 80 degrees at a typical radius", () => {
+  for (const coin of COINS.filter((c) => c.wording.flow !== "straight")) {
+    const letters = arcLetters(coin.wording.text, 40, fitFont(coin.wording.text, 40), coin.wording.at, coin.wording.flow);
+    const angles = letters.map((l) => l.angle);
+    const span = Math.max(...angles) - Math.min(...angles);
+    assert.ok(span >= 60 && span <= 80, `${coin.id} spans ${span.toFixed(1)}`);
+  }
 });

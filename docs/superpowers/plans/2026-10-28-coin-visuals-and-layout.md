@@ -345,3 +345,118 @@ The spec's section 5 "Choice" changed after Tasks 1-7 were built: the Theme fiel
 - [ ] **Step 2: Full verification.** `npm run test:coverage` and `npm run test:e2e:coverage` both exit 0, `main.js` at least 80% lines.
 - [ ] **Step 3: Smoke test the real page by hand,** from a plain `python3 -m http.server` (wait until `curl` returns 200) and from `node e2e/serve.js`: at 1280x720 and 375x667, light and dark, click Endless, Custom (3.95, Start) and Cashier from Home; add a coin from the dock; press Enter; press Back; press the theme button three times; read the console for errors after each step. Stop every server you start.
 - [ ] **Step 4: Commit** `docs: describe the round 2 menu, tray and shortcut changes` (explicit paths only).
+
+---
+
+## Round 3 (Tasks 14-19): phone frame, Cashier dock, Home feedback, reference lettering, dark metals, review items
+
+**Spec:** section 7 of `docs/superpowers/specs/2026-10-28-coin-visuals-and-layout-design.md`; it wins over sections 1-6 where they conflict. The Global Constraints and Rulings at the top still apply (no change to `state.js`, `game.js`, `drag.js` or `dwell.js`; no new dependency; both gates pass). One commit per task. Reference images for Task 17 are in `docs/ref/` (untracked; read them, do not commit them).
+
+**Rulings for round 3**
+- The e2e default viewport (1280x720) now gives a 433x720 frame; existing specs that assumed a wide layout are updated, not the game.
+- `theme-boot.js`, `src/state.js`, `src/drag.js` stay as they are. The tray drag ghost stays appended to `<body>`; the frame must not create a containing block for `position: fixed`.
+- Held-key repeat is blocked on the play screen (Task 19) instead of moving focus away from Next after a solve, to keep keyboard users' focus on the success action.
+
+**Review Focus for round 3** (each pinned by a named test)
+- Frame has no gap: top bar + content + dock heights sum to the frame height, and the page never scrolls (Task 14).
+- The drag ghost still lands correctly when the frame is centred on a large screen (Task 14, drag from the tray at 1440x960).
+- Cashier input is in the dock and the dock stays in the viewport (Task 15).
+- None of the three mode buttons is accent-filled at rest; hover is not applied on touch (Task 16).
+- Every arc letter clears both lines at its own angle, upright letters read left to right, and the 5p numeral never overlaps its wording at any rotation (Task 17).
+- Each metal is at least 3:1 against the pile in both themes (Task 18).
+- A held Enter activates a focused Next at most once; the light-theme major grid layer is on top (Task 19).
+
+### Task 14: Phone-sized frame
+
+**Files:**
+- Modify: `index.html`, `styles.css`, and the e2e specs listed in Step 4
+- Create: `e2e/frame.spec.js`
+
+**Interfaces:**
+- Produces: `main` is the frame (CSS variables `--frame-w: 433px`, `--frame-h: 771px`); `#screen-play` is a flex column of `.topbar`, `.content` (new wrapper, the only scrolling element, holds `.board`) and `.dock`; Home and Custom screens are scrolling flex children of the frame. No `position: sticky` and no wide-screen media queries remain.
+
+- [ ] **Step 1: Write failing e2e** `e2e/frame.spec.js` per spec 7.8 "e2e, frame": at 433x771, 375x667, 360x800, 393x852, 1440x960, 912x1368 and 852x393, for Home, Endless and Cashier: the frame (`main`) is `min(viewport, 433x771)`; centred within 1 px horizontally and vertically when the viewport is larger; `documentElement.scrollHeight <= innerHeight` and `scrollWidth <= innerWidth`; `.topbar` and `.dock` are inside the frame and the viewport; `.topbar` height + `.content` height + `.dock` height (plus gaps) equals the frame's inner height within 2 px. At 433x771 the Endless pile card and the whole Home screen need no scrolling (`scrollHeight <= clientHeight`). Frame decoration (border radius greater than 0) only when the viewport is wider than 433 px. A tray-to-pile drag at 1440x960 puts the coin where it was released (guards the fixed drag ghost).
+- [ ] **Step 2:** Run `npx playwright test e2e/frame.spec.js`. Expected: FAIL.
+- [ ] **Step 3: Implement.** `index.html`: viewport meta `width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content`; wrap `.board` in `<div class="content">` inside `#screen-play` (the dock and top bar stay siblings). `styles.css`: `html, body { height: 100%; overflow: hidden }`; `body` centres the frame; `main` per spec 7.1 (`width: min(100%, var(--frame-w)); height: min(100dvh, var(--frame-h))`, flex column, padding with `max(<normal>, env(safe-area-inset-*))` on all four sides, `overflow: hidden`); `.content { flex: 1; min-height: 0; overflow-y: auto }`; Home and Custom sections scroll inside the frame (`min-height: 0; overflow-y: auto`), Home content centred vertically; `.topbar` and `.dock` are `flex: none` with no sticky; frame look (radius, border, shadow, page background around it) inside `@media (min-width: 434px)`. Remove: all `position: sticky`, `scroll-padding-block`, `#screen-play { min-height }`, `.dock { margin-top: auto }`, and every `@media (min-width: 48rem)` rule (board columns, tray row, dock row, `main` max-width, `.board.single`). The tray is always two rows of four.
+- [ ] **Step 4:** Update existing e2e: remove the wide "one row" and "buttons to the right" assertions in `e2e/dock.spec.js`; replace page-scroll assertions in `e2e/phone.spec.js` (and any `scrollY`/`scrollTo` use) with the content area's scroll where relevant; keep Home centring and no-overflow checks; update `e2e/grid.spec.js` 1280 cases (the tray scale is now the frame's); fix any spec where the 433-wide frame changes a coordinate. Run `npm run test:e2e:coverage` and `npm run test:coverage`. Expected: pass.
+- [ ] **Step 5: Visual check.** Screenshot Home, Endless and Cashier at 433x771, 375x667, 1440x960 and 912x1368 in light and dark; look for gaps, clipped content, the frame look and the page background.
+- [ ] **Step 6: Commit** `feat: hold the whole app in a phone-sized frame`.
+
+### Task 15: Cashier input in the dock
+
+**Files:**
+- Modify: `index.html`, `styles.css`, `src/main.js`, `e2e/cashier.spec.js`, `e2e/phone.spec.js`, `e2e/contrast.spec.js`
+- Create: `e2e/cashier-dock.spec.js`
+
+**Interfaces:**
+- Produces: `.dock` order in Cashier: `#play-message`, `#cashier-error`, then a row `<div id="cashier-answer">` with a "Total (£)" label above `#cashier-input` and `#btn-check` to its right. Hidden outside Cashier. Ids unchanged.
+
+- [ ] **Step 1: Write failing e2e** `e2e/cashier-dock.spec.js`: at 375x667, 360x800 and 393x852 in Cashier, `#cashier-input`, its label, `#cashier-error` (after an invalid entry) and `#btn-check` are inside `.dock` and in the viewport; the old in-flow field no longer exists in `.content`; Check and Enter still check; a correct answer shows Next, locks the field and hides Check; the field and label are hidden in Endless and Custom; the focused input is not covered by the dock (it is part of it).
+- [ ] **Step 2:** Run it. Expected: FAIL.
+- [ ] **Step 3: Implement.** Move `#cashier-answer` (label, input, error) from the page flow into `.dock` in the order above; compact styles (small label, input flexible width with `min-width: 0`, Check on the right, error line with no height when empty). `main.js` needs no new logic beyond selectors that referenced the old position, if any. Update `e2e/cashier.spec.js` and `e2e/phone.spec.js` (the old "input clear of both bars" check becomes "input inside the dock") and `e2e/contrast.spec.js` selectors.
+- [ ] **Step 4:** Run `npm run test:e2e:coverage`. Expected: pass.
+- [ ] **Step 5: Visual check.** Screenshot Cashier at 375x667 and 433x771 in light and dark, empty and with an error and after solving.
+- [ ] **Step 6: Commit** `feat: move the Cashier amount field into the dock`.
+
+### Task 16: Home buttons show feedback and the selected difficulty
+
+**Files:**
+- Modify: `index.html`, `styles.css`, `e2e/home.spec.js`
+- Create: `e2e/home-feedback.spec.js`
+
+- [ ] **Step 1: Write failing e2e** `e2e/home-feedback.spec.js`: at rest none of `#btn-endless`, `#btn-custom`, `#btn-cashier` has the accent fill (computed `background-color` equals the neutral panel colour, and none has class `primary`); with a hover-capable context hovering a mode button changes its computed `border-color` to the accent and its background; pressing (`mouse.down`) gives the accent fill; the checked difficulty label has an accent border and `font-weight` of 600 or more, and switching the radio moves it; `#btn-check` in the dock is still the accent colour.
+- [ ] **Step 2:** Run it. Expected: FAIL.
+- [ ] **Step 3: Implement.** Remove `class="primary"` from `#btn-endless`. `styles.css`: hover rules inside `@media (hover: hover)` (accent border, light tint from a themed `--accent-tint` variable: plain light value plus a `light-dark()` pair); `:active` accent fill for the three mode buttons; `.difficulty label:has(input:checked)` accent border, tint and `font-weight: 700`. Add `--accent-tint` to the variable list so the existing fallback test covers it.
+- [ ] **Step 4:** Run `npm run test:coverage` and `npm run test:e2e:coverage`; the contrast e2e covers the new states in both themes (add the hovered and checked states to its selector list). Expected: pass.
+- [ ] **Step 5: Commit** `feat: show hover, pressed and selected states on Home`.
+
+### Task 17: Lettering like the reference coins
+
+**Files:**
+- Modify: `src/coins.js`, `src/shapes.js`, `src/render.js`, `tests/coins.test.js`, `tests/shapes.test.js`, `tests/render.test.js`, `styles.css` (only if needed)
+
+**Interfaces:**
+- `coins.js` entries: `wording: { text, at, flow }` per spec 7.4's table (`flow`: `"outer"`, `"upright"` or `"straight"`); the 5p also gets `numeralY: 72`.
+- `shapes.js`: `fitFont(text, radius, spanDeg = 72, maxFont = 8.5) -> number` (font so the text spans `spanDeg`, advance per character 0.7 times the font); `arcLetters(text, radius, fontSize, at = 0, flow = "outer") -> Array<{ char, angle, flip }>` where `angle` is each letter's position in degrees clockwise from the top (centred on `at`), increasing for `"outer"` and decreasing for `"upright"` (so it reads left to right along the bottom), `flip` is true for `"upright"`. Existing callers are updated.
+- Rendering: `"outer"` letters at `x=50 y=50-r` with `transform="rotate(angle 50 50)"`; `"upright"` letters at `x=50 y=50+r` with `transform="rotate(angle+180 50 50)"`; both with `text-anchor="middle" dominant-baseline="central"`. `"straight"`: one `<text class="coin-word" x="50" y="50" text-anchor="middle" dominant-baseline="central" textLength="66" lengthAdjust="spacing" font-size="9">`. The rim line width is 70 for all coins. Per coin, the baseline radius is the middle of the band between the rim line's outer edge and the body's inner stroke edge over the letters' angular span (sampled with `shapeRadiusAt`), and the font is the smallest of `fitFont`, `(bandWidth - 1.0) / 0.72`, and 8.5.
+
+- [ ] **Step 1: Write failing tests.**
+  - `tests/coins.test.js`: the wording data equals the table (2p and 10p `at 0 outer`, 1p `270 outer`, 20p `90 outer`, £2 `300 outer`, 50p and £1 `180 upright`, 5p `straight`); 5p `numeralY` is 72.
+  - `tests/shapes.test.js`: `fitFont` makes `(n - 1) * 0.7 * font / radius` radians about equal to `spanDeg` unless capped; `arcLetters` with `at: 270` is centred on 270 and increasing; with `flow: "upright"` and `at: 180` the first letter has the largest angle (letters run counter-clockwise), `flip` is true; spans are 60 to 80 degrees for every coin's real text.
+  - `tests/render.test.js`: each arc coin has one `coin-word` text per non-space letter and each letter clears the rim line and the body edge by at least 0.5 units at its own angle (cap height 0.72 times the font; use `shapeRadiusAt` for the circle, Reuleaux heptagon and 12-gon); the 5p has exactly one `coin-word` text with `textLength` and its numeral's `y` is 72 with the numeral top at least 2 units below the wording's bottom; `upright` letters carry a rotation of `angle + 180`; no `id` attribute anywhere; no `textPath`.
+- [ ] **Step 2:** Run `node --test`. Expected: FAIL.
+- [ ] **Step 3: Implement** per Interfaces; keep numerals, disc and shine as they are, re-check that the £1 and £2 inner disc (radius 31) still clears the rim line at width 70.
+- [ ] **Step 4:** Run `npm run test:coverage` and `npm run test:e2e:coverage`. Expected: pass.
+- [ ] **Step 5: Visual check.** Compare each coin at 300 px against `docs/ref/<name>.webp` side by side (screenshot the SVG and read both images): position, direction, size and span should match the reference; tune font and radius within the limits above. Record the final numbers in the commit message.
+- [ ] **Step 6: Commit** `feat: draw coin wording like the reference coins`.
+
+### Task 18: Themed metal colours for dark mode
+
+**Files:**
+- Modify: `src/coins.js`, `src/render.js`, `styles.css`, `tests/coins.test.js`, `tests/render.test.js`, `e2e/contrast.spec.js`, `e2e/coins.spec.js`
+
+**Interfaces:**
+- `coins.js` entries gain `metal: "copper" | "silver" | "gold"` and, for the £1 and £2, `discMetal`; `fill` and `ring` keep their light values. `coinSvg` puts the class `metal-<name>` on `coin-body` and `coin-disc` and no longer writes the metal as an attribute. CSS variables `--metal-copper`, `--metal-silver`, `--metal-gold` (plain light value in `:root`, `light-dark()` pair in the `@supports` block); `.metal-copper { fill: var(--metal-copper) }` and so on.
+
+- [ ] **Step 1: Write failing tests.** `tests/coins.test.js`: every coin has a valid `metal` and the £1 and £2 a valid `discMetal`. `tests/render.test.js`: body and disc carry the right `metal-*` class and no inline `fill` for the metal. `e2e/contrast.spec.js`: replace "coins render the same fills in both schemes" with: each metal's resolved fill against `.pile`'s background is at least 3:1 in light and in dark, and the light fills equal today's values (`#b87333`, `#c9ccd1`, `#d4af37`). `tests/theme-css.test.js` (existing) must still pass, which covers the plain fallbacks.
+- [ ] **Step 2:** Run both. Expected: FAIL.
+- [ ] **Step 3: Implement.** Light values: copper `#b87333`, silver `#c9ccd1`, gold `#d4af37`. Starting dark values: copper `#a0622d`, silver `#9ea5af`, gold `#bf9b30`; dark `--coin-edge` `#ffffff33`. Take a "before" screenshot first (Endless with a mix of coins at 433x771 in dark), then tune the dark values by eye until the coins no longer look like stickers while the contrast test passes; take an "after" screenshot. Save both as `.superpowers/coin-visuals/dark-before.png` and `dark-after.png` and mention them in the report so the user can look.
+- [ ] **Step 4:** Run `npm run test:coverage` and `npm run test:e2e:coverage`. Expected: pass.
+- [ ] **Step 5: Commit** `feat: theme the coin metals so dark mode looks right`.
+
+### Task 19: Review items, docs and full verification
+
+**Files:**
+- Modify: `src/main.js`, `styles.css`, `e2e/serve.js`, `package.json`, `README.md`, `e2e/home.spec.js`, `e2e/enter.spec.js`
+- Create: `e2e/server.spec.js`
+
+- [ ] **Step 1: Write failing tests.**
+  - Held key: on a solved round, with focus on `#btn-next`, dispatching `keydown` Enter with `repeat: true` does not activate it (no new round), while a normal Enter keydown/up does (after the advance guard); same for Space; this is in `e2e/enter.spec.js`.
+  - Grid: in the light theme the computed `background-image` of `.pile` lists the `--grid-major` layers first, at five times the cell size (`e2e/grid.spec.js`).
+  - Server: `GET /` returns `Cache-Control: no-cache` (`e2e/server.spec.js`, using the `request` fixture).
+  - Rewrite `e2e/home.spec.js` so "labels do not wrap" compares each label's height to one line height at 320x640 and fails when the text wraps, and "Enter does nothing on Home" asserts the Home screen is still shown and no round started.
+- [ ] **Step 2:** Run them. Expected: FAIL.
+- [ ] **Step 3: Implement.** `main.js`: a `keydown` listener (capture) on the play screen that `preventDefault`s Enter and Space when `e.repeat`. `styles.css`: list the `--grid-major` layers first in the pile and tray `background-image`. `e2e/serve.js`: send `Cache-Control: no-cache` and listen on `process.env.PORT || 4173`. `package.json`: add `"start": "node e2e/serve.js"`. `README.md`: tell users to run `npm start` (http://localhost:4173), that `python3 -m http.server` can leave a browser with a stale `main.js` after an update and to hard-refresh (Ctrl+Shift+R); describe the phone frame, Cashier input in the bar, Home feedback; update the Layout list.
+- [ ] **Step 4: Full verification.** `npm run test:coverage` and `npm run test:e2e:coverage` both exit 0, `main.js` at least 80% lines.
+- [ ] **Step 5: Smoke test the real page,** from `npm start` and from a plain `python3 -m http.server` on a spare port (wait until `curl` returns 200): at 433x771, 375x667 and 1440x960, light and dark, click Endless, Custom (3.95, Start) and Cashier from Home; add coins from the dock by tap and by drag; type a Cashier amount in the dock and press Enter; press Back and the theme button; read the console after each step. Take screenshots and look at them, including the eight coins against `docs/ref/`. Stop every server you start.
+- [ ] **Step 6: Commit** `fix: block held-key repeat, fix grid major lines, add npm start` and, if the README changed separately, `docs: describe round 3` (explicit paths only).
