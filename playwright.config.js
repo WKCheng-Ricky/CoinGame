@@ -4,8 +4,9 @@ const CI = !!process.env.CI;
 
 export default defineConfig({
   testDir: "e2e",
-  // one worker, tests in order: coverage collects in one process (see e2e/coverage.js)
-  workers: 1,
+  // whole spec files run in parallel; E2E_WORKERS overrides (default 6 locally, 2 on CI).
+  // Coverage is safe across workers: entries land in Monocart's on-disk cache (see e2e/coverage.js)
+  workers: Number(process.env.E2E_WORKERS) || (CI ? 2 : 6),
   fullyParallel: false,
   forbidOnly: CI,
   reporter: CI ? [["list"], ["html", { open: "never" }]] : "list",

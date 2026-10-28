@@ -1,31 +1,108 @@
 :root {
+  color-scheme: light dark;
+  --frame-w: 433px;
+  --frame-h: 771px;
   --bg: #f6f3ec;
   --ink: #1f2430;
+  --muted: #5a6070;
+  --panel: #fff;
+  --pile-bg: #faf8f3;
+  --line: #d8d2c4;
+  --control-border: #8a8577;
   --accent: #2f6f4f;
   --accent-ink: #fff;
-  --panel: #fff;
-  --line: #d8d2c4;
+  --accent-tint: #e6f0ea;
   --good: #1f7a3f;
   --hint: #9a5b00;
   --bad: #b3261e;
+  --badge-bg: #1f2430;
+  --badge-ink: #fff;
+  --focus: #1a73e8;
+  --grid: #d8d2c4;
+  --grid-major: #b5ae9b;
+  --lift-shadow: #00000055;
+  --coin-edge: #00000080;
+  --metal-copper: #b87333;
+  --metal-silver: #c9ccd1;
+  --metal-gold: #d4af37;
+  --coin-ink: #222;
+}
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+
+/* Browsers without this function keep the plain light values above. */
+@supports (color: light-dark(#000, #fff)) {
+  :root {
+    --bg: light-dark(#f6f3ec, #14171d);
+    --ink: light-dark(#1f2430, #e9e6df);
+    --muted: light-dark(#5a6070, #a2a9b8);
+    --panel: light-dark(#fff, #1d222b);
+    --pile-bg: light-dark(#faf8f3, #11141a);
+    --line: light-dark(#d8d2c4, #3a4150);
+    --control-border: light-dark(#8a8577, #7d8596);
+    --accent: light-dark(#2f6f4f, #3f9d6e);
+    --accent-ink: light-dark(#fff, #0c1710);
+    --accent-tint: light-dark(#e6f0ea, #1f3a2d);
+    --good: light-dark(#1f7a3f, #5fd08a);
+    --hint: light-dark(#9a5b00, #e0a24a);
+    --bad: light-dark(#b3261e, #ff8a80);
+    --badge-bg: light-dark(#1f2430, #e9e6df);
+    --badge-ink: light-dark(#fff, #14171d);
+    --focus: light-dark(#1a73e8, #8ab4f8);
+    --grid: light-dark(#d8d2c4, #ffffff1a);
+    --grid-major: light-dark(#b5ae9b, #ffffff40);
+    --lift-shadow: light-dark(#00000055, #ffffffa6);
+    --coin-edge: light-dark(#00000080, #ffffff33);
+    --metal-copper: light-dark(#b87333, #a8682f);
+    --metal-silver: light-dark(#c9ccd1, #9ea5af);
+    --metal-gold: light-dark(#d4af37, #bf9b30);
+    --coin-ink: light-dark(#222, #000);
+  }
+}
+@supports not (color: light-dark(#000, #fff)) {
+  .theme-toggle { display: none !important; }
 }
 
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 
+/* Coin lettering is measured against these glyphs (e2e/lettering.spec.js), so it must not depend on the system font. Noto Sans, SIL OFL 1.1, subset to letters, digits and the pound sign. */
+@font-face { font-family: "CoinLetters"; font-weight: 600; font-display: swap; src: url("fonts/NotoSans-SemiBold-subset.woff2") format("woff2"); }
+@font-face { font-family: "CoinLetters"; font-weight: 700; font-display: swap; src: url("fonts/NotoSans-Bold-subset.woff2") format("woff2"); }
+
+html, body { height: 100%; overflow: hidden; }
+
 body {
   margin: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   background: var(--bg);
   color: var(--ink);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   line-height: 1.4;
 }
 
-main { max-width: 40rem; margin: 0 auto; padding: 1rem; }
-@media (min-width: 48rem) { main { max-width: 56rem; } }
+/* The whole app lives in a phone-shaped frame. No transform, filter or contain: paint here:
+   the tray drag ghost is position: fixed and must keep the viewport as its containing block. */
+main {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  width: min(100%, var(--frame-w));
+  height: min(100vh, var(--frame-h));
+  height: min(100dvh, var(--frame-h));
+  overflow-x: hidden;
+  overflow-y: auto; /* only when large text squeezes the play area to its minimum */
+  padding: max(0.5rem, env(safe-area-inset-top)) 1rem max(0.5rem, env(safe-area-inset-bottom));
+  padding-inline: max(1rem, env(safe-area-inset-left)) max(1rem, env(safe-area-inset-right));
+}
+@media (min-width: 434px) {
+  main { border: 2px solid var(--line); border-radius: 1.5rem; box-shadow: 0 8px 30px #0003; }
+}
 
 h1, h2 { margin: 0.5rem 0; }
-h2 { font-size: 1rem; color: #5a6070; font-weight: 600; }
+h2 { font-size: 1rem; color: var(--muted); font-weight: 600; }
 
 button, input {
   font: inherit;
@@ -42,56 +119,98 @@ button {
   cursor: pointer;
 }
 button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-button:focus-visible, input:focus-visible { outline: 3px solid #1a73e8; outline-offset: 2px; }
+/* The three mode buttons all just start a game, so none looks selected: they react to hover and press. */
+@media (hover: hover) { .stack-col button:hover { border-color: var(--accent); background: var(--accent-tint); } }
+.stack-col button:active { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
-input { width: 100%; padding: 0.5rem 0.75rem; border: 2px solid var(--line); font-size: 1.25rem; }
+input { width: 100%; padding: 0.5rem 0.75rem; border: 2px solid var(--control-border); background: var(--panel); color: var(--ink); font-size: 1.25rem; }
 label { display: block; margin: 0.5rem 0 0.25rem; }
 input[type="radio"] { width: auto; min-height: 0; }
 
-.difficulty { max-width: 16rem; margin: 0.75rem 0; padding: 0.5rem 0.75rem; border: 2px solid var(--line); border-radius: 0.8rem; background: var(--panel); }
-.difficulty label { display: flex; align-items: center; gap: 0.5rem; min-height: 44px; margin: 0; }
+.choice { width: 100%; max-width: 18.5rem; margin: 0.75rem auto; padding: 0.5rem 0.75rem; border: 2px solid var(--line); border-radius: 0.8rem; background: var(--panel); }
+.choice legend { padding-inline: 0.3rem; color: var(--muted); }
+.difficulty label { display: flex; align-items: center; gap: 0.5rem; min-height: 44px; margin: 0; padding-inline: 0.5rem; border: 2px solid transparent; border-radius: 0.6rem; }
+.difficulty label:has(input:checked) { border-color: var(--accent); background: var(--accent-tint); font-weight: 700; }
 .difficulty input { flex: none; }
+.choice-note { min-height: 1.4em; margin: -0.25rem 0 0.5rem; color: var(--muted); font-size: 0.85rem; }
+.choice .stack-col { margin: 0 auto 0.5rem; }
 
+.coin-edge { stroke: var(--coin-edge); }
+.metal-copper { fill: var(--metal-copper); }
+.metal-silver { fill: var(--metal-silver); }
+.metal-gold { fill: var(--metal-gold); }
+.coin-word, .coin-label { fill: var(--coin-ink); }
 .coin-label { transition: opacity 200ms; }
-.board[data-difficulty="normal"] .coin-label { opacity: 0; }
-.board[data-difficulty="normal"] .revealed .coin-label { opacity: 1; }
+[data-difficulty="normal"] .coin-label { opacity: 0; }
+[data-difficulty="normal"] .revealed .coin-label { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .coin-label { transition: none; } }
 
 .stack-col { display: flex; flex-direction: column; gap: 0.75rem; max-width: 16rem; }
 .row { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 0.75rem 0; }
-.cashier-answer { margin: 0.75rem 0; }
-.cashier-answer input { max-width: 12rem; }
 .error { color: var(--bad); min-height: 1.4em; margin: 0.5rem 0; }
 
-.label { display: block; margin: 0.5rem 0 0; color: #5a6070; font-size: 1rem; font-weight: 400; text-align: center; }
-.target { margin: 0; font-size: 3.5rem; font-weight: 800; line-height: 1.2; text-align: center; }
+.label { color: var(--muted); font-size: 0.9rem; font-weight: 400; }
+.target { margin: 0; font-size: clamp(1.2rem, 5vw, 1.75rem); font-weight: 800; line-height: 1.2; text-align: center; }
 [tabindex="-1"]:focus { outline: none; }
-.rounds { margin: 0; text-align: center; color: #5a6070; }
+.rounds { margin: 0; text-align: center; color: var(--muted); font-size: 0.9rem; line-height: 1.2; }
 
-.board { display: grid; gap: 1rem; margin-top: 0.5rem; }
-@media (min-width: 48rem) { .board { grid-template-columns: 1fr 1fr; } }
-@media (min-width: 48rem) { .board.single { grid-template-columns: minmax(0, 28rem); justify-content: center; } }
-.pile-area, .tray-area { background: var(--panel); border: 2px solid var(--line); border-radius: 0.8rem; padding: 0.75rem; }
+.content { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 3rem; overflow-y: auto; }
+.board { display: grid; width: 100%; margin-block: auto; flex: none; grid-template-columns: minmax(0, 28rem); justify-content: center; }
+.pile-area { background: var(--panel); border: 2px solid var(--line); border-radius: 0.8rem; padding: 0.75rem; }
 
+/* 1 cm graph paper at the coins' own scale: thin lines every cm, a stronger line on every fifth.
+   The stronger (major) layers come first so they are painted on top of the opaque minor lines. */
+.pile, .tray {
+  --grid-lines:
+    linear-gradient(to right, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(to right, var(--grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+}
 .pile {
+  --cell-w: calc(10 / var(--pile-w-mm, 138.4) * 100%);
+  --cell-h: calc(10 / var(--pile-h-mm, 118.4) * 100%);
+  --grid-sizes: calc(5 * var(--cell-w)) 100%, 100% calc(5 * var(--cell-h)), var(--cell-w) 100%, 100% var(--cell-h);
   position: relative;
   container-type: inline-size;
   width: min(100%, calc(var(--pile-w-mm, 138.4) * 0.17rem));
   margin-inline: auto;
   aspect-ratio: var(--pile-w-mm, 138.4) / var(--pile-h-mm, 118.4);
-  background: #faf8f3;
+  background-color: var(--pile-bg);
+  background-image: var(--grid-lines);
+  background-size: var(--grid-sizes);
   border: 2px dashed var(--line);
   border-radius: 0.8rem;
 }
+.pile-area h2 { margin-top: 0; }
+.scale-note { margin: -0.25rem 0 0.5rem; color: var(--muted); font-size: 0.8rem; }
 .total { margin: 0.5rem 0 0; font-size: 1.4rem; font-weight: 700; }
 
+
 .tray {
+  --mm: min(0.17rem, 0.75cqw);
+  --cell: calc(10 * var(--mm));
+  position: relative;
   container-type: inline-size;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.5rem;
+  gap: 0.25rem 0.5rem;
   justify-items: center;
   align-items: center;
+  padding: 0.4rem;
+  border: 2px dashed var(--line);
+  border-radius: 0.8rem;
+  background-color: var(--pile-bg);
+}
+
+.tray::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: var(--grid-lines);
+  background-size: calc(5 * var(--cell)) 100%, 100% calc(5 * var(--cell)), var(--cell) 100%, 100% var(--cell);
 }
 
 /* The button keeps a 44px tap area; the drawn coin keeps its real relative size. */
@@ -109,34 +228,85 @@ input[type="radio"] { width: auto; min-height: 0; }
 .pile-coin { position: absolute; translate: -50% -50%; border-radius: 50%; min-width: 0; min-height: 0; }
 .pile-coin:focus-visible { z-index: 1; }
 .pile-coin { touch-action: none; cursor: grab; transition: left 150ms ease-out, top 150ms ease-out; }
-.pile-coin.dragging { cursor: grabbing; z-index: 1000; transition: none; translate: calc(-50% + var(--dx, 0px)) calc(-50% + var(--dy, 0px)); filter: drop-shadow(0 3px 4px #0005); }
-.board.locked .pile-coin { cursor: default; }
+.pile-coin.dragging { cursor: grabbing; z-index: 1000; transition: none; translate: calc(-50% + var(--dx, 0px)) calc(-50% + var(--dy, 0px)); filter: drop-shadow(0 3px 4px var(--lift-shadow)); }
+#screen-play.locked .pile-coin { cursor: default; }
 .pile-coin svg { width: calc(var(--d) / var(--pile-w-mm) * 100cqw); transform: rotate(var(--rot)); pointer-events: none; }
 .pile-coin .coin-label { transform: rotate(calc(-1 * var(--rot))); transform-box: fill-box; transform-origin: center; }
-.stack-badge { position: absolute; right: 2px; bottom: 2px; z-index: 1; padding: 0 5px; border-radius: 999px; background: #1f2430; color: #fff; border: 1px solid #fff; font-size: 0.75rem; font-weight: 700; line-height: 1.3; pointer-events: none; user-select: none; }
+.stack-badge { position: absolute; right: 2px; bottom: 2px; z-index: 1; padding: 0 5px; border-radius: 999px; background: var(--badge-bg); color: var(--badge-ink); border: 1px solid var(--badge-ink); font-size: 0.75rem; font-weight: 700; line-height: 1.3; pointer-events: none; user-select: none; }
 .settle { animation: settle 150ms ease-out; }
 @keyframes settle { from { opacity: 0; transform: scale(1.15); } }
 @media (prefers-reduced-motion: reduce) { .settle { animation: none; } .pile-coin { transition: none; } }
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 /* In the tray, never let a coin outgrow its column (cqw = tray width). */
-.coin svg { width: calc(var(--d) * min(0.17rem, 0.75cqw)); }
+.coin svg { width: calc(var(--d) * var(--mm)); }
 .coin:active, .pile-coin:active { transform: scale(0.94); }
 /* held 1 s on a stack: lifted off it (after :active so the lift wins while pressed) */
-.pile-coin.detached, .pile-coin.detached:active { transform: scale(1.08); filter: drop-shadow(0 3px 4px #0005); z-index: 1000; }
+.pile-coin.detached, .pile-coin.detached:active { transform: scale(1.08); filter: drop-shadow(0 3px 4px var(--lift-shadow)); z-index: 1000; }
 
-.message { min-height: 1.6em; margin: 0.75rem 0 0; font-size: 1.15rem; font-weight: 600; text-align: center; }
+.message { min-height: 1.5em; margin: 0 0 0.4rem; font-size: 1.05rem; font-weight: 600; text-align: center; line-height: 1.4; }
 .message.success { color: var(--good); }
 .message.hint { color: var(--hint); }
-.actions { justify-content: center; }
 
-.pile:empty::before { content: "Tap a coin to add it"; color: #5a6070; position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
-.board.locked .coin, .board.locked .pile-coin { opacity: 0.5; }
+#screen-play { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.topbar, .dock {
+  flex: none;
+  background: var(--panel);
+  border: 2px solid var(--line);
+  border-radius: 0.8rem;
+  box-shadow: 0 2px 6px #0002;
+}
+.topbar { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.6rem; }
+.topbar button { padding: 0.25rem 0.7rem; flex: none; }
+.topbar-info { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; }
+.dock { padding: 0.5rem 0.6rem; }
+.actions { justify-content: center; margin: 0.5rem 0 0; }
+
+/* Cashier: message, error, then a small label above one row with the field and Check on its right.
+   #cashier-answer and .actions dissolve into the dock grid so Check can sit beside the field. */
+#cashier-answer { display: contents; }
+#screen-play.cashier .dock { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 0.5rem; align-items: center; }
+#screen-play.cashier .actions { display: contents; }
+/* solved: Check is hidden, so drop its column and let the locked field reach the dock's edge */
+#screen-play.cashier.locked .dock { grid-template-columns: minmax(0, 1fr); }
+#screen-play.cashier .dock > .message, #screen-play.cashier .error, #screen-play.cashier .cashier-answer label { grid-column: 1 / -1; }
+#screen-play.cashier .actions button { grid-column: 1 / -1; margin-top: 0.5rem; }
+#screen-play.cashier .actions #btn-check { grid-column: 2; margin-top: 0; }
+.cashier-answer label { margin: 0 0 0.15rem; font-size: 0.85rem; color: var(--muted); }
+.cashier-answer input { min-width: 0; min-height: 44px; }
+.dock .error { min-height: 0; margin: 0; }
+.dock .error:not(:empty) { margin: 0 0 0.3rem; }
+
+#screen-home, #screen-custom { flex: 1; min-height: 0; overflow-y: auto; }
+#screen-home { position: relative; display: grid; align-content: safe center; justify-items: center; text-align: center; }
+.stack-col { margin-inline: auto; width: 100%; }
+.difficulty label { text-align: left; }
+
+.pile:empty::before { content: "Tap a coin to add it"; color: var(--muted); position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
+#screen-play.locked .coin, #screen-play.locked .pile-coin { opacity: 0.5; }
 
 .coin, .pile-coin { -webkit-touch-callout: none; user-select: none; }
 
 .coin { touch-action: none; cursor: grab; }
 .coin.dragging-source { opacity: 0.5; }
-.tray-ghost { position: fixed; left: 0; top: 0; z-index: 2000; pointer-events: none; filter: drop-shadow(0 3px 4px #0005); }
+.tray-ghost { position: fixed; left: 0; top: 0; z-index: 2000; pointer-events: none; filter: drop-shadow(0 3px 4px var(--lift-shadow)); }
 .tray-ghost svg { display: block; width: 100%; height: 100%; }
 .pile.over-pile { outline: 3px solid var(--accent); outline-offset: -3px; }
-.board.locked .coin { cursor: default; }
+#screen-play.locked .coin { cursor: default; }
+
+.theme-toggle { position: absolute; top: 0; right: 0; min-width: 44px; min-height: 44px; padding: 0; border-radius: 50%; display: grid; place-items: center; color: var(--ink); }
+.theme-toggle svg { display: none; }
+.theme-toggle[data-state="auto"] .icon-auto, .theme-toggle[data-state="light"] .icon-light, .theme-toggle[data-state="dark"] .icon-dark { display: block; }
+
+/* Short windows (a landscape phone): tighter bars, a one-row tray at one shared scale, so the pile stays in view. */
+@media (max-height: 30rem) {
+  main { padding-block: max(0.25rem, env(safe-area-inset-top)) max(0.25rem, env(safe-area-inset-bottom)); }
+  #screen-play { gap: 0.25rem; }
+  .topbar { padding-block: 0.15rem; }
+  .topbar button { padding-block: 0; }
+  .target { font-size: 1.2rem; line-height: 1.1; }
+  .dock { padding-block: 0.25rem; }
+  .message { min-height: 1.2em; margin-bottom: 0.15rem; font-size: 0.95rem; line-height: 1.2; }
+  .actions { margin-top: 0.25rem; gap: 0.5rem; }
+  .cashier-answer label { margin: 0; }
+  .tray { --mm: min(0.17rem, 0.36cqw); grid-template-columns: repeat(8, minmax(0, 1fr)); column-gap: 0.25rem; padding-block: 0.15rem; }
+}

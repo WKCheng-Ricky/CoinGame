@@ -31,7 +31,9 @@ export async function counterTotalPence(page) {
 }
 
 // Open Home with fast timings and start a mode by its Home button.
-export async function startMode(page, name) {
+// { difficulty: "easy" } selects Easy first (the running total is shown only in Easy).
+export async function startMode(page, name, { difficulty } = {}) {
   await page.goto("/?" + FAST);
+  if (difficulty) await page.locator(`#diff-${difficulty}`).check();
   await page.getByRole("button", { name, exact: true }).click();
 }

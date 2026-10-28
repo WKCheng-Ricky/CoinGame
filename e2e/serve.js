@@ -1,4 +1,4 @@
-// Minimal static file server for the e2e tests (no Python, no extra package).
+// Minimal static file server for `npm start` and the e2e tests (no Python, no extra package). PORT sets the port (default 4173).
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -12,6 +12,7 @@ const TYPES = {
   ".js": "text/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".svg": "image/svg+xml",
+  ".woff2": "font/woff2",
 };
 
 function send(res, status, text) {
@@ -34,6 +35,6 @@ createServer(async (req, res) => {
   } catch {
     return send(res, 404, "Not found");
   }
-  res.writeHead(200, { "content-type": TYPES[extname(file)] ?? "application/octet-stream", "cache-control": "no-store" });
+  res.writeHead(200, { "content-type": TYPES[extname(file)] ?? "application/octet-stream", "cache-control": "no-cache" });
   createReadStream(file).pipe(res);
 }).listen(PORT, () => console.log(`Serving ${ROOT} on http://localhost:${PORT}`));

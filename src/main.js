@@ -2,6 +2,8 @@ import { describePile, detachNudge, formatPence, parseAmount, randomTarget, tota
 import { createDwell } from "./dwell.js";
 import { timingFromSearch } from "./config.js";
 import { createDrag, createTrayDrag } from "./drag.js";
+import { isCheckShortcut } from "./keys.js";
+import { applyTheme, getStorage, nextTheme, readTheme, saveTheme, themeLabel } from "./theme.js";
 import { announce, renderPile, renderTray, setText, showStackBadges } from "./render.js";
 import {
   addToPile, canAdvance, clearPile, createState, isContinuous, nextCustomer, nextRound, startCashier, submitAnswer,
@@ -16,6 +18,38 @@ let state = createState();
 let shownMessage = state.message;
 let shownPile;
 let detachedUid = null; // the held, detached coin: it does not count toward stack badges
+
+function syncThemeColor() {
+  const meta = document.querySelector('meta[name="theme-color"]');
+  // light-dark() stays unresolved in a custom property, so read the body's resolved colour
+  if (meta) meta.content = getComputedStyle(document.body).backgroundColor;
+}
+
+function initTheme() {
+  const storage = getStorage(window);
+  let theme = readTheme(storage);
+  const button = $("btn-theme");
+  const show = () => {
+    applyTheme(document.documentElement, theme);
+    syncThemeColor();
+    if (!button) return;
+    button.dataset.state = theme;
+    button.setAttribute("aria-label", themeLabel(theme));
+    button.title = themeLabel(theme);
+  };
+  show();
+  button?.addEventListener("click", () => {
+    theme = nextTheme(theme);
+    saveTheme(storage, theme);
+    show();
+  });
+  window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", syncThemeColor);
+}
+initTheme();
+
+// iOS Safari only applies :active (the pressed fill on the mode buttons) when a touch
+// listener exists on the element or an ancestor. This one is a deliberate no-op.
+document.querySelector(".stack-col")?.addEventListener("touchstart", () => {}, { passive: true });
 
 const timing = timingFromSearch(location.search);
 
@@ -110,10 +144,14 @@ function render() {
     // drop dwells on removed pile coins (untouched pile and tray coins keep theirs)
     dwell.prune((el) => el.isConnected);
   }
-  document.querySelector(".board").dataset.difficulty = state.difficulty;
+  const screen = $("screen-play");
+  screen.dataset.difficulty = state.difficulty;
+  // the tray drag ghost lives in <body> (drag.js), so mirror the difficulty there for the label rules
+  document.body.dataset.difficulty = state.difficulty;
   setText($("play-total"), cashier ? "" : `Your total: ${formatPence(total(state.pile))}`);
-  $("play-total").hidden = cashier;
-  document.querySelector(".tray-area").hidden = cashier;
+  // in Normal a visible total would give away the hidden coin values
+  $("play-total").hidden = cashier || state.difficulty !== "easy";
+  $("play-tray").hidden = cashier;
   $("cashier-answer").hidden = !cashier;
   $("cashier-input").disabled = state.solved;
   setText($("pile-heading"), cashier ? "On the counter" : "Your coins");
@@ -131,8 +169,8 @@ function render() {
   $("btn-again").hidden = !(state.solved && !endless);
   $("btn-change").hidden = !(state.solved && !endless);
 
-  document.querySelector(".board").classList.toggle("locked", state.solved);
-  document.querySelector(".board").classList.toggle("single", cashier);
+  screen.classList.toggle("locked", state.solved);
+  screen.classList.toggle("cashier", cashier);
   for (const btn of document.querySelectorAll(".coin, .pile-coin")) {
     if (state.solved) btn.setAttribute("aria-disabled", "true");
     else btn.removeAttribute("aria-disabled");
@@ -231,6 +269,52 @@ document.querySelector(".difficulty").addEventListener("change", (e) => {
   update(setDifficulty(state, e.target.value));
 });
 
+// Hold, hover or focus a difficulty label to read what it means, without choosing it.
+function watchDifficultyNotes(fieldset) {
+  const note = $("difficulty-note");
+  let touching = false; // a non-mouse press is down
+  let heldReveal = false; // that press revealed a note, so its click must not select
+  const notes = createDwell({
+    delay: timing.dwellMs,
+    onReveal: (label) => {
+      setText(note, label.title);
+      if (touching) heldReveal = true;
+    },
+    onHide: () => setText(note, ""),
+  });
+  const labelOf = (e) => e.target.closest?.("label");
+  fieldset.addEventListener("pointerover", (e) => {
+    const label = labelOf(e);
+    if (label) notes.start(label);
+  });
+  fieldset.addEventListener("pointerout", (e) => {
+    const label = labelOf(e);
+    if (label && !label.contains(e.relatedTarget)) notes.stop(label);
+  });
+  fieldset.addEventListener("focusin", (e) => {
+    const label = labelOf(e);
+    if (label && focusVisible(e.target)) notes.start(label);
+  });
+  fieldset.addEventListener("focusout", (e) => {
+    const label = labelOf(e);
+    if (label) notes.stop(label);
+  });
+  fieldset.addEventListener("pointerdown", (e) => {
+    heldReveal = false;
+    touching = e.pointerType !== "mouse";
+  });
+  const release = () => { touching = false; };
+  fieldset.addEventListener("pointerup", release);
+  fieldset.addEventListener("pointercancel", release);
+  fieldset.addEventListener("contextmenu", (e) => e.preventDefault());
+  fieldset.addEventListener("click", (e) => {
+    if (!heldReveal) return;
+    heldReveal = false;
+    if (labelOf(e)) e.preventDefault();
+  });
+}
+watchDifficultyNotes(document.querySelector(".difficulty"));
+
 $("play-tray").addEventListener("click", (e) => {
   const btn = e.target.closest("[data-coin]");
   if (btn && !takeSwallow($("play-tray"), btn.dataset.coin)) addCoin(btn.dataset.coin);
@@ -279,11 +363,23 @@ function checkCashier() {
 $("cashier-input").addEventListener("keydown", (e) => {
   if (e.key === "Enter") { e.preventDefault(); checkCashier(); }
 });
-$("btn-check").addEventListener("click", () => {
+function runCheck() {
   if (state.mode === "cashier") { checkCashier(); return; }
   update(submitCheck(state, performance.now()));
   if (state.solved) document.querySelector(".actions button:not([hidden])").focus();
+}
+$("btn-check").addEventListener("click", runCheck);
+// Enter (or Ctrl/Cmd+Enter) is a shortcut for Check on the play screen
+document.addEventListener("keydown", (e) => {
+  if (e.defaultPrevented || $("screen-play").hidden || state.solved || !isCheckShortcut(e)) return;
+  e.preventDefault();
+  runCheck();
 });
+// A held Enter or Space must not repeat-activate a button: Enter held to Check would otherwise carry on
+// into the Next that focus moves to after the solve, and skip the result.
+$("screen-play").addEventListener("keydown", (e) => {
+  if (e.repeat && (e.key === "Enter" || e.key === " ")) e.preventDefault();
+}, true);
 $("btn-next").addEventListener("click", () => {
   if (!canAdvance(state, performance.now(), timing.advanceDelayMs)) return;
   if (state.mode === "cashier") {

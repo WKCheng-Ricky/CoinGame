@@ -10,7 +10,7 @@ async function addCoins(page, labels) {
 
 test("tapping a pile coin removes it and hands focus to the top coin, then to the tray", async ({ page }) => {
   await seedRandom(page);
-  await startMode(page, "Endless");
+  await startMode(page, "Endless", { difficulty: "easy" });
   await addCoins(page, ["50p", "5p"]);
   await expect(page.locator("#play-total")).toHaveText("Your total: £0.55");
 
@@ -44,21 +44,20 @@ test.describe("touch", () => {
   test("a long press that reveals a value adds or removes exactly one coin", async ({ page }) => {
     await seedRandom(page);
     await startMode(page, "Endless");
-    await expect(page.locator(".board")).toHaveAttribute("data-difficulty", "normal");
+    await expect(page.locator("#screen-play")).toHaveAttribute("data-difficulty", "normal");
 
     const tray20 = page.getByRole("button", { name: "Add 20p", exact: true });
     await longPress(page, tray20);
     await expect(pileCoins(page)).toHaveCount(1);
-    await expect(page.locator("#play-total")).toHaveText("Your total: £0.20");
+    await expect(page.locator("#play-pile-summary")).toHaveText("In the pile: 1 × 20p");
 
     await longPress(page, tray20);
     await expect(pileCoins(page)).toHaveCount(2);
-    await expect(page.locator("#play-total")).toHaveText("Your total: £0.40");
+    await expect(page.locator("#play-pile-summary")).toHaveText("In the pile: 2 × 20p");
 
     // the click that may follow the release is swallowed: one coin per press
     await longPress(page, pileCoins(page).last());
     await expect(pileCoins(page)).toHaveCount(1);
-    await expect(page.locator("#play-total")).toHaveText("Your total: £0.20");
     await expect(page.locator("#play-pile-summary")).toHaveText("In the pile: 1 × 20p");
   });
 });

@@ -31,7 +31,7 @@ test("coin shapes and rings match real coins", () => {
   assert.equal(coinById("50p").shape, "heptagon");
   assert.equal(coinById("£1").shape, "dodecagon");
   assert.equal(coinById("1p").shape, "round");
-  assert.deepEqual(COINS.filter((c) => c.ring).map((c) => c.id), ["£1", "£2"]);
+  assert.deepEqual(COINS.filter((c) => c.discMetal).map((c) => c.id), ["£1", "£2"]);
 });
 
 test("formatPence formats pounds and pence", () => {

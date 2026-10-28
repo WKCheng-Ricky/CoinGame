@@ -20,7 +20,7 @@ async function expectNoHorizontalOverflow(page) {
 
 test("easy at 390x844: Cashier coin values are visible and nothing overflows sideways", async ({ page }) => {
   await openCashier(page, "easy");
-  await expect(page.locator(".board")).toHaveAttribute("data-difficulty", "easy");
+  await expect(page.locator("#screen-play")).toHaveAttribute("data-difficulty", "easy");
   const labels = page.locator("#play-pile .pile-coin .coin-label");
   expect(await labels.count()).toBeGreaterThanOrEqual(2);
   for (const label of await labels.all()) await expect(label).toHaveCSS("opacity", "1");
@@ -30,7 +30,7 @@ test("easy at 390x844: Cashier coin values are visible and nothing overflows sid
 
 test("normal at 390x844: values hide until hover or keyboard focus dwells, and nothing overflows sideways", async ({ page }) => {
   await openCashier(page, "normal");
-  await expect(page.locator(".board")).toHaveAttribute("data-difficulty", "normal");
+  await expect(page.locator("#screen-play")).toHaveAttribute("data-difficulty", "normal");
   const coins = page.locator("#play-pile .pile-coin");
   for (const label of await coins.locator(".coin-label").all()) await expect(label).toHaveCSS("opacity", "0");
 

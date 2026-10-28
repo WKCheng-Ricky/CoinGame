@@ -6,6 +6,7 @@
     "node": ">=22.22.2"
   },
   "scripts": {
+    "start": "node e2e/serve.js",
     "test": "node --test",
     "test:coverage": "c8 --all --check-coverage --lines 80 --branches 80 --functions 80 --per-file --include 'src/**' --exclude 'src/main.js' --reporter=text --reporter=lcov --reports-dir=coverage/unit node --test",
     "test:e2e": "playwright test",
