@@ -44,7 +44,7 @@ function paddingRect(el) {
   return { left: b.left + el.clientLeft, top: b.top + el.clientTop, width: el.clientWidth, height: el.clientHeight };
 }
 
-export function createDrag(container, { onMove, onMoveGroup, getGroup, onDragStart, isLocked, onDetach, onDetachEnd, onDetachRelease }) {
+export function createDrag(container, { onMove, onMoveGroup, getGroup, onDragStart, isLocked, onDetach, onDetachEnd, onDetachRelease, holdMs = DETACH_HOLD_MS }) {
   let suppress = false;
   // { id, type, el, uid, uids, members, startX, startY, offX, offY, dragging, group, single, timer }
   let track = null;
@@ -118,7 +118,7 @@ export function createDrag(container, { onMove, onMoveGroup, getGroup, onDragSta
         suppress = true; // a held coin stays separated: the release is not a tap
         t.single = true;
         if (onDetach) { t.detachedNotified = true; onDetach(t.uid); }
-      }, DETACH_HOLD_MS);
+      }, holdMs);
     }
     try { el.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
   });
@@ -166,6 +166,7 @@ export function createDrag(container, { onMove, onMoveGroup, getGroup, onDragSta
         onMoveGroup(t.uids, d.x, d.y, t.uid);
       } else {
         const { x, y } = toPileFraction({ x: e.clientX + t.offX, y: e.clientY + t.offY }, rect);
+        // the fraction is unclamped on purpose: moveCoin (state.js) clamps it
         onMove(t.uid, x, y);
       }
     } finally {

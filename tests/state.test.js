@@ -156,6 +156,12 @@ test("canAdvance needs a solved round and 400ms", () => {
   assert.equal(canAdvance(solved, 1400), true);
 });
 
+test("canAdvance uses a custom delay", () => {
+  const solved = { ...startGame(createState(), "custom", 395), solved: true, solvedAt: 0 };
+  assert.equal(canAdvance(solved, 250, 250), true);
+  assert.equal(canAdvance(solved, 249, 250), false);
+});
+
 test("setDifficulty switches between easy and normal without touching the round", () => {
   const s = withPile(startGame(createState(), "endless", 395), pileOf("£1"));
   const easy = setDifficulty(s, "easy");
