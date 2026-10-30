@@ -447,3 +447,83 @@ test("createTrayDrag: a key press after a drag clears the suppression", withDom(
   click(window, coin);
   assert.equal(clicked, 1);
 }));
+
+test("createTrayDrag resolves a pileEl getter on every pointer event", withDom((t, { window, document }) => {
+  const { coin, pileEl: elA, board } = setupTray(document);
+  const elB = document.createElement("div");
+  board.append(elB);
+  stubRect(elB, BOX);
+  for (const [k, v] of Object.entries({ clientLeft: 0, clientTop: 0, clientWidth: 400, clientHeight: 300 })) {
+    Object.defineProperty(elB, k, { value: v });
+  }
+  // a second tray drag on its own container, with a getter in place of the element
+  const tray = document.createElement("div");
+  const trayCoin = coin.cloneNode(true);
+  tray.append(trayCoin);
+  board.append(tray);
+  let current = elA;
+  const drops = [];
+  createTrayDrag(tray, { onDrop: (...a) => drops.push(a), onDragStart: () => {}, isLocked: () => false, pileEl: () => current });
+  fire(window, trayCoin, "pointerdown", { clientX: 500, clientY: 400 });
+  fire(window, trayCoin, "pointermove", { clientX: 300, clientY: 150 });
+  assert.ok(elA.classList.contains("over-pile"));
+  current = elB; // the getter switches mid-drag: the next event uses the new element
+  fire(window, trayCoin, "pointermove", { clientX: 310, clientY: 150 });
+  assert.ok(elB.classList.contains("over-pile"));
+  assert.ok(!elA.classList.contains("over-pile"));
+  fire(window, trayCoin, "pointerup", { clientX: 310, clientY: 150 });
+  assert.ok(!elB.classList.contains("over-pile"));
+  assert.equal(drops.length, 1);
+  assert.equal(drops[0][0], "20p");
+}));
+
+import { heightForBox, CUSTOMER_BOX_MM } from "../src/game.js";
+
+for (const [name, make] of [["a function", (h) => () => h], ["a number", (h) => h]]) {
+  test(`createDrag resolves heightMm given as ${name}`, withDom((t, { window, document }) => {
+    const h = heightForBox(CUSTOMER_BOX_MM);
+    const { container, calls } = setup(document, { heightMm: make(h) });
+    const coin = addCoin(document, container, 1, 120, 120);
+    fire(window, coin, "pointerdown", { clientX: 110, clientY: 110 });
+    fire(window, coin, "pointermove", { clientX: 210, clientY: 160 });
+    fire(window, coin, "pointerup", { clientX: 210, clientY: 160 });
+    const { x, y } = toPileFraction({ x: 220, y: 170 }, BOX, h);
+    assert.ok(Math.abs(calls.move[0][1] - x) < 1e-9);
+    assert.ok(Math.abs(calls.move[0][2] - y) < 1e-9);
+    assert.ok(Math.abs(y - toPileFraction({ x: 220, y: 170 }, BOX).y) > 0.1);
+  }));
+}
+
+test("createDrag with heightMm moves a group by the fraction for that height", withDom((t, { window, document }) => {
+  const h = heightForBox(CUSTOMER_BOX_MM);
+  const { container, calls } = setup(document, { heightMm: () => h, getGroup: () => [1, 2] });
+  const a = addCoin(document, container, 1, 120, 120);
+  addCoin(document, container, 2, 130, 130);
+  fire(window, a, "pointerdown", { clientX: 120, clientY: 120 });
+  fire(window, a, "pointermove", { clientX: 200, clientY: 180 });
+  fire(window, a, "pointerup", { clientX: 200, clientY: 180 });
+  const d = pixelsToFraction(80, 60, BOX, h);
+  assert.ok(Math.abs(calls.group[0][2] - d.y) < 1e-9);
+}));
+
+for (const [name, make] of [["a function", (h) => () => h], ["a number", (h) => h]]) {
+  test(`createTrayDrag maps the drop with heightMm given as ${name}`, withDom((t, { window, document }) => {
+    const h = heightForBox(CUSTOMER_BOX_MM);
+    const { pileEl, board } = setupTray(document);
+    const tray = document.createElement("div");
+    const coin = document.createElement("button");
+    coin.dataset.coin = "20p";
+    tray.append(coin);
+    board.append(tray);
+    const drops = [];
+    createTrayDrag(tray, { onDrop: (...a) => drops.push(a), onDragStart: () => {}, isLocked: () => false, pileEl, heightMm: make(h) });
+    fire(window, coin, "pointerdown", { clientX: 500, clientY: 400 });
+    fire(window, coin, "pointermove", { clientX: 300, clientY: 60 });
+    fire(window, coin, "pointerup", { clientX: 300, clientY: 60 });
+    const want = toPileFraction({ x: 300, y: 60 }, BOX, h);
+    assert.equal(drops.length, 1);
+    assert.ok(Math.abs(drops[0][1] - want.x) < 1e-9);
+    assert.ok(Math.abs(drops[0][2] - want.y) < 1e-9);
+    assert.ok(Math.abs(want.y - toPileFraction({ x: 300, y: 60 }, BOX).y) > 0.1);
+  }));
+}

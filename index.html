@@ -35,6 +35,7 @@
           <button id="btn-endless">Endless</button>
           <button id="btn-custom">Custom</button>
           <button id="btn-cashier">Cashier</button>
+          <button id="btn-give-change">Give Change</button>
         </div>
       </fieldset>
     </section>
@@ -59,15 +60,29 @@
           <h1 id="play-heading" class="target" tabindex="-1"><span id="play-heading-label" class="label">Make</span> <span id="play-target"></span></h1>
           <p id="play-rounds" class="rounds" hidden></p>
         </div>
+        <div id="topbar-customer" role="group" aria-labelledby="customer-coins-label" hidden>
+          <p id="customer-coins-label" class="pile-label">Customer Coins:</p>
+        </div>
       </header>
       <div class="content">
         <div class="board">
-          <div class="pile-area">
+          <div id="play-area" class="pile-area">
             <h2 id="pile-heading">Your coins</h2>
             <p class="scale-note">you can drag the coin around and stack them</p>
             <div id="play-pile" class="pile"></div>
             <p id="play-pile-summary" class="sr-only"></p>
             <p id="play-total" class="total" aria-live="polite"></p>
+          </div>
+          <div id="change-area" class="pile-area" hidden>
+            <h2 id="change-heading">Your change</h2>
+            <p class="scale-note">you can drag the coin around and stack them</p>
+            <div id="change-pile" class="pile"></div>
+            <p id="change-pile-summary" class="sr-only"></p>
+            <p id="change-total" class="total" aria-live="polite" hidden></p>
+            <div class="answers">
+              <button id="btn-short" hidden>Not enough!</button>
+              <button id="btn-none" hidden>No change</button>
+            </div>
           </div>
         </div>
       </div>

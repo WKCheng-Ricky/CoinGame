@@ -85,7 +85,7 @@ for (const phone of PHONES) {
       for (const coin of await page.locator("#play-tray .coin").all()) await expect(coin).toBeInViewport({ ratio: 1 });
       await expect(page.locator("#btn-check")).toBeInViewport({ ratio: 1 });
       await expect(page.locator("#btn-clear")).toBeInViewport({ ratio: 1 });
-      if (phone.pileFits) await expect(page.locator(".pile-area")).toBeInViewport({ ratio: 1 });
+      if (phone.pileFits) await expect(page.locator(".pile-area:not([hidden])")).toBeInViewport({ ratio: 1 });
     });
   }
 }

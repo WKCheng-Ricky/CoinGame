@@ -106,3 +106,14 @@ test("pixelsToFraction maps zero to zero and matches toPileFraction differences"
   approx(pixelsToFraction(PILE_WIDTH_MM, PILE_HEIGHT_MM, sized).x, 1);
   approx(pixelsToFraction(PILE_WIDTH_MM, PILE_HEIGHT_MM, sized).y, 1);
 });
+
+import { heightForBox, CUSTOMER_BOX_MM } from "../src/game.js";
+
+test("toPileFraction and pixelsToFraction honour a custom height", () => {
+  const h = heightForBox(CUSTOMER_BOX_MM);
+  const rect = { left: 10, top: 20, width: W, height: h + 2 * PILE_MARGIN_MM };
+  const p = toPileFraction({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }, rect, h);
+  approx(p.x, 0);
+  approx(p.y, 0);
+  approx(pixelsToFraction(0, rect.height, rect, h).y, (h + 2 * PILE_MARGIN_MM) / h);
+});

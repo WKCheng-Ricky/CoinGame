@@ -114,8 +114,8 @@ export function coinSvg(coin) {
   return `<svg viewBox="0 0 100 100" aria-hidden="true" focusable="false">${body}${rim}${shine}${disc}${wordingLetters(coin, layout)}${label}</svg>`;
 }
 
-function placeCoin(btn, entry) {
-  const { left, top } = pileBox(entry);
+function placeCoin(btn, entry, heightMm) {
+  const { left, top } = pileBox(entry, heightMm);
   const l = `${left}%`, t = `${top}%`, r = `${entry.rot}deg`;
   if (btn.style.left !== l) btn.style.left = l;
   if (btn.style.top !== t) btn.style.top = t;
@@ -141,9 +141,9 @@ export function coinLabel(coin, removable) {
   return removable ? `Remove ${coin.label}` : `${coin.label} coin`;
 }
 
-export function renderPile(container, pile, excludeUid = null, removable = true) {
+export function renderPile(container, pile, excludeUid = null, removable = true, heightMm = PILE_HEIGHT_MM) {
   container.style.setProperty("--pile-w-mm", PILE_WIDTH_MM + 2 * PILE_MARGIN_MM);
-  container.style.setProperty("--pile-h-mm", PILE_HEIGHT_MM + 2 * PILE_MARGIN_MM);
+  container.style.setProperty("--pile-h-mm", heightMm + 2 * PILE_MARGIN_MM);
   const existing = new Map([...container.children].map((el) => [el.dataset.uid, el]));
   const live = new Set(pile.map((e) => String(e.uid)));
   for (const [uid, el] of existing) {
@@ -159,22 +159,22 @@ export function renderPile(container, pile, excludeUid = null, removable = true)
       btn = coinButton(coin, "pile-coin settle", coinLabel(coin, removable));
       btn.setAttribute("aria-description", "Use arrow keys to move");
       btn.dataset.uid = key;
-      placeCoin(btn, entry);
+      placeCoin(btn, entry, heightMm);
       btn.addEventListener("animationend", () => btn.classList.remove("settle"), { once: true });
       container.append(btn);
     } else {
       btn.setAttribute("aria-label", coinLabel(COINS.find((c) => c.id === entry.coinId), removable));
-      placeCoin(btn, entry);
+      placeCoin(btn, entry, heightMm);
     }
     return btn;
   });
   if (ordered.some((el, i) => container.children[i] !== el)) container.replaceChildren(...ordered);
-  showStackBadges(container, pile, excludeUid);
+  showStackBadges(container, pile, excludeUid, heightMm);
 }
 
 // excludeUid (a detached coin) does not count: it gets no badge and its former stack shows the reduced count
-export function showStackBadges(container, pile, excludeUid = null) {
-  const counts = stackCounts(excludeUid === null ? pile : pile.filter((e) => e.uid !== excludeUid));
+export function showStackBadges(container, pile, excludeUid = null, heightMm = PILE_HEIGHT_MM) {
+  const counts = stackCounts(excludeUid === null ? pile : pile.filter((e) => e.uid !== excludeUid), heightMm);
   for (const btn of container.children) {
     const uid = Number(btn.dataset.uid);
     updateBadge(btn, uid === excludeUid ? undefined : counts.get(uid));
