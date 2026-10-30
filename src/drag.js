@@ -5,7 +5,6 @@ export const DRAG_THRESHOLD_PX = 6;
 
 // The pile box (centre area plus a margin on each side), as laid out by pileBox.
 const BOX_W_MM = PILE_WIDTH_MM + 2 * PILE_MARGIN_MM;
-const BOX_H_MM = PILE_HEIGHT_MM + 2 * PILE_MARGIN_MM;
 
 export function passesThreshold(dx, dy) {
   return Math.hypot(dx, dy) > DRAG_THRESHOLD_PX;
@@ -21,9 +20,9 @@ export function coinSizePx(coin, pileRect) {
 }
 
 // Inverse of pileBox: maps a viewport point to pile fractions. Unclamped.
-export function toPileFraction({ x: px, y: py }, rect) {
+export function toPileFraction({ x: px, y: py }, rect, heightMm = PILE_HEIGHT_MM) {
   const x = (((px - rect.left) / rect.width) * BOX_W_MM - PILE_MARGIN_MM) / PILE_WIDTH_MM - 0.5;
-  const y = (((py - rect.top) / rect.height) * BOX_H_MM - PILE_MARGIN_MM) / PILE_HEIGHT_MM - 0.5;
+  const y = (((py - rect.top) / rect.height) * (heightMm + 2 * PILE_MARGIN_MM) - PILE_MARGIN_MM) / heightMm - 0.5;
   return { x, y };
 }
 
@@ -31,10 +30,10 @@ export function toPileFraction({ x: px, y: py }, rect) {
 export const DETACH_HOLD_MS = 1000;
 
 // A pixel delta as a pile-fraction delta (the linear part of toPileFraction).
-export function pixelsToFraction(dxPx, dyPx, rect) {
+export function pixelsToFraction(dxPx, dyPx, rect, heightMm = PILE_HEIGHT_MM) {
   return {
     x: ((dxPx / rect.width) * BOX_W_MM) / PILE_WIDTH_MM,
-    y: ((dyPx / rect.height) * BOX_H_MM) / PILE_HEIGHT_MM,
+    y: ((dyPx / rect.height) * (heightMm + 2 * PILE_MARGIN_MM)) / heightMm,
   };
 }
 
@@ -44,7 +43,8 @@ function paddingRect(el) {
   return { left: b.left + el.clientLeft, top: b.top + el.clientTop, width: el.clientWidth, height: el.clientHeight };
 }
 
-export function createDrag(container, { onMove, onMoveGroup, getGroup, onDragStart, isLocked, onDetach, onDetachEnd, onDetachRelease, holdMs = DETACH_HOLD_MS }) {
+export function createDrag(container, { onMove, onMoveGroup, getGroup, onDragStart, isLocked, onDetach, onDetachEnd, onDetachRelease, holdMs = DETACH_HOLD_MS, heightMm = PILE_HEIGHT_MM }) {
+  const height = () => (typeof heightMm === "function" ? heightMm() : heightMm);
   let suppress = false;
   // { id, type, el, uid, uids, members, startX, startY, offX, offY, dragging, group, single, timer }
   let track = null;
@@ -162,10 +162,10 @@ export function createDrag(container, { onMove, onMoveGroup, getGroup, onDragSta
     for (const m of flat) m.style.transition = "none";
     try {
       if (t.group) {
-        const d = pixelsToFraction(e.clientX - t.startX, e.clientY - t.startY, rect);
+        const d = pixelsToFraction(e.clientX - t.startX, e.clientY - t.startY, rect, height());
         onMoveGroup(t.uids, d.x, d.y, t.uid);
       } else {
-        const { x, y } = toPileFraction({ x: e.clientX + t.offX, y: e.clientY + t.offY }, rect);
+        const { x, y } = toPileFraction({ x: e.clientX + t.offX, y: e.clientY + t.offY }, rect, height());
         // the fraction is unclamped on purpose: moveCoin (state.js) clamps it
         onMove(t.uid, x, y);
       }
@@ -196,17 +196,21 @@ export function createDrag(container, { onMove, onMoveGroup, getGroup, onDragSta
   return { suppressed: () => suppress, active: () => !!(track && track.dragging) };
 }
 
-export function createTrayDrag(container, { onDrop, onDragStart, isLocked, pileEl }) {
+// pileEl is the drop target, or a function returning it (resolved on every pointer event);
+// heightMm is its play-area height, a number or a function (resolved at the drop)
+export function createTrayDrag(container, { onDrop, onDragStart, isLocked, pileEl, heightMm = PILE_HEIGHT_MM }) {
+  const target = () => (typeof pileEl === "function" ? pileEl() : pileEl);
+  const height = () => (typeof heightMm === "function" ? heightMm() : heightMm);
   let suppress = false;
-  let track = null; // { id, type, el, startX, startY, dragging, ghost, size }
+  let track = null; // { id, type, el, startX, startY, dragging, ghost, size, pile }
 
   const finish = (t) => {
     t.ghost?.remove();
     t.el.classList.remove("dragging-source");
-    pileEl.classList.remove("over-pile");
+    t.pile?.classList.remove("over-pile");
   };
 
-  const inPile = (e) => pointInRect({ x: e.clientX, y: e.clientY }, pileEl.getBoundingClientRect());
+  const inPile = (e, pile) => pointInRect({ x: e.clientX, y: e.clientY }, pile.getBoundingClientRect());
 
   const moveGhost = (t, e) => {
     t.ghost.style.transform = `translate(${e.clientX - t.size / 2}px, ${e.clientY - t.size / 2}px)`;
@@ -221,7 +225,7 @@ export function createTrayDrag(container, { onDrop, onDragStart, isLocked, pileE
     if (e.pointerType === "mouse" && e.button !== 0) return;
     const el = e.target.closest?.("[data-coin]");
     if (!el) return;
-    track = { id: e.pointerId, type: e.pointerType, el, startX: e.clientX, startY: e.clientY, dragging: false, ghost: null };
+    track = { id: e.pointerId, type: e.pointerType, el, startX: e.clientX, startY: e.clientY, dragging: false, ghost: null, pile: null };
     try { el.setPointerCapture(e.pointerId); } catch { /* pointer already gone */ }
   });
 
@@ -236,7 +240,7 @@ export function createTrayDrag(container, { onDrop, onDragStart, isLocked, pileE
       onDragStart(t.el);
       t.el.classList.add("dragging-source");
       const coin = COINS.find((c) => c.id === t.el.dataset.coin);
-      const size = coinSizePx(coin, { width: pileEl.clientWidth });
+      const size = coinSizePx(coin, { width: target().clientWidth });
       t.size = size;
       const ghost = document.createElement("div");
       ghost.className = "tray-ghost";
@@ -253,7 +257,10 @@ export function createTrayDrag(container, { onDrop, onDragStart, isLocked, pileE
       t.ghost = ghost;
     }
     moveGhost(t, e);
-    pileEl.classList.toggle("over-pile", inPile(e));
+    const pile = target();
+    if (t.pile && t.pile !== pile) t.pile.classList.remove("over-pile");
+    t.pile = pile;
+    pile.classList.toggle("over-pile", inPile(e, pile));
   });
 
   container.addEventListener("pointerup", (e) => {
@@ -261,10 +268,11 @@ export function createTrayDrag(container, { onDrop, onDragStart, isLocked, pileE
     const t = track;
     track = null;
     if (!t.dragging) return;
-    const inside = inPile(e);
+    const pile = target();
+    const inside = inPile(e, pile);
     finish(t);
     if (!inside) return;
-    const { x, y } = toPileFraction({ x: e.clientX, y: e.clientY }, paddingRect(pileEl));
+    const { x, y } = toPileFraction({ x: e.clientX, y: e.clientY }, paddingRect(pile), height());
     onDrop(t.el.dataset.coin, x, y);
   });
 

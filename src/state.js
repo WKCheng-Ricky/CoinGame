@@ -1,6 +1,8 @@
 import { COINS } from "./coins.js";
 import {
-  check, checkAnswer, clampPosition, formatPence, placeCoin, placeHandfulCoin, randomHandful, settlePile, settleGroup,
+  CHANGE_BOX_COMPACT_MM, CHANGE_BOX_MM, CUSTOMER_BOX_MM, PILE_HEIGHT_MM, changeDue, check, checkAnswer, clampPosition, formatPence,
+  heightForBox, judgeAnswer, placeCoin, placeHandfulCoin, priceFor, randomHandful, rollScenario, settlePile,
+  settleGroup, total,
 } from "./game.js";
 
 export const ADVANCE_DELAY_MS = 400;
@@ -11,6 +13,7 @@ export function createState() {
   return {
     mode: "endless", target: 0, pile: [], nextUid: 1, rounds: 0, solved: false, solvedAt: 0,
     message: NO_MESSAGE, difficulty: "normal",
+    change: [], price: 0, scenario: "",
   };
 }
 
@@ -27,10 +30,24 @@ export function nextRound(state, target) {
   return { ...createState(), mode: state.mode, rounds: state.rounds, target, difficulty: state.difficulty };
 }
 
-function placeAndSettle(state, coin, place, rng) {
-  const entry = { uid: state.nextUid, coinId: coin.id, ...place(state.pile, coin, rng) };
-  const pile = settlePile([...state.pile, entry], entry.uid, null);
-  return { ...state, pile, nextUid: state.nextUid + 1, message: NO_MESSAGE };
+// Play-area height of a pile: Give Change mode gives the customer's and the player's piles short boxes.
+// `compact` (a short screen, from the UI) shrinks the player's pile to the customer's 4 cm box.
+export function pileHeightMm(state, key = "pile", compact = false) {
+  if (state.mode !== "give-change") return PILE_HEIGHT_MM;
+  if (key !== "change") return heightForBox(CUSTOMER_BOX_MM);
+  return heightForBox(compact ? CHANGE_BOX_COMPACT_MM : CHANGE_BOX_MM);
+}
+
+function placeAndSettle(state, coin, place, rng, key = "pile", compact = false) {
+  const h = pileHeightMm(state, key, compact);
+  const entry = { uid: state.nextUid, coinId: coin.id, ...place(state[key], coin, rng, h) };
+  const list = settlePile([...state[key], entry], entry.uid, null, h);
+  return { ...state, [key]: list, nextUid: state.nextUid + 1, message: NO_MESSAGE };
+}
+
+// In Cashier and Give Change the customer's pile is read-only; only the change list is editable in Give Change.
+function locked(state, key) {
+  return state.solved || state.mode === "cashier" || (state.mode === "give-change" && key === "pile");
 }
 
 function dealHandful(state, ids, rng) {
@@ -41,6 +58,45 @@ function dealHandful(state, ids, rng) {
 export function startCashier(state, rng = Math.random) {
   const fresh = { ...createState(), mode: "cashier", difficulty: state.difficulty };
   return dealHandful(fresh, randomHandful(rng), rng);
+}
+
+function setScenario(state, odds, rng) {
+  const paid = total(state.pile);
+  const scenario = rollScenario(odds, rng, paid);
+  return { ...state, scenario, price: priceFor(paid, scenario, rng) };
+}
+
+export function startGiveChange(state, odds, rng = Math.random) {
+  const fresh = { ...createState(), mode: "give-change", difficulty: state.difficulty };
+  return setScenario(dealHandful(fresh, randomHandful(rng), rng), odds, rng);
+}
+
+export function nextGiveChangeCustomer(state, odds, rng = Math.random) {
+  const previous = state.pile.map((e) => e.coinId);
+  const fresh = { ...createState(), mode: "give-change", rounds: state.rounds, difficulty: state.difficulty };
+  return setScenario(dealHandful(fresh, randomHandful(rng, previous), rng), odds, rng);
+}
+
+function successText(scenario, due, shortBy) {
+  if (scenario === "over") return `Correct! Change: ${formatPence(due)}.`;
+  if (scenario === "exact") return "Correct! No change due.";
+  return `Correct! They are ${formatPence(shortBy)} short.`;
+}
+
+export function submitGiveChangeAnswer(state, action, now) {
+  if (state.solved) return state;
+  const due = changeDue(total(state.pile), state.price);
+  const result = judgeAnswer(state.scenario, action, total(state.change), due);
+  if (result.correct) {
+    return {
+      ...state,
+      solved: true,
+      solvedAt: now,
+      rounds: state.rounds + 1,
+      message: { text: successText(state.scenario, due, state.price - total(state.pile)), kind: "success" },
+    };
+  }
+  return { ...state, message: { text: result.hint, kind: "hint" } };
 }
 
 export function nextCustomer(state, rng = Math.random) {
@@ -68,67 +124,67 @@ export function submitAnswer(state, pence, now) {
 }
 
 export function isContinuous(state) {
-  return state.mode === "endless" || state.mode === "cashier";
+  return state.mode === "endless" || state.mode === "cashier" || state.mode === "give-change";
 }
 
-export function addToPile(state, coinId, rng = Math.random) {
+export function addToPile(state, coinId, rng = Math.random, key = "pile", compact = false) {
   const coin = COINS.find((c) => c.id === coinId);
-  if (state.solved || state.mode === "cashier" || !coin) return state;
-  return placeAndSettle(state, coin, placeCoin, rng);
+  if (locked(state, key) || !coin) return state;
+  return placeAndSettle(state, coin, placeCoin, rng, key, compact);
 }
 
-export function addToPileAt(state, coinId, x, y, rng = Math.random) {
-  if (state.solved || state.mode === "cashier" || !COINS.some((c) => c.id === coinId)) return state;
+export function addToPileAt(state, coinId, x, y, rng = Math.random, key = "pile") {
+  if (locked(state, key) || !COINS.some((c) => c.id === coinId)) return state;
   const entry = { uid: state.nextUid, coinId, ...clampPosition(x, y), rot: Math.floor(rng() * 360) };
-  return { ...state, pile: [...state.pile, entry], nextUid: state.nextUid + 1, message: NO_MESSAGE };
+  return { ...state, [key]: [...state[key], entry], nextUid: state.nextUid + 1, message: NO_MESSAGE };
 }
 
-export function removeFromPile(state, uid) {
-  if (state.solved || state.mode === "cashier" || !state.pile.some((e) => e.uid === uid)) return state;
-  return { ...state, pile: state.pile.filter((e) => e.uid !== uid), message: NO_MESSAGE };
+export function removeFromPile(state, uid, key = "pile") {
+  if (locked(state, key) || !state[key].some((e) => e.uid === uid)) return state;
+  return { ...state, [key]: state[key].filter((e) => e.uid !== uid), message: NO_MESSAGE };
 }
 
-export function moveCoin(state, uid, x, y) {
+export function moveCoin(state, uid, x, y, key = "pile") {
   if (state.solved) return state;
-  const moved = state.pile.find((e) => e.uid === uid);
+  const moved = state[key].find((e) => e.uid === uid);
   if (!moved) return state;
-  const others = state.pile.filter((e) => e.uid !== uid);
-  return { ...state, pile: [...others, { ...moved, ...clampPosition(x, y) }] };
+  const others = state[key].filter((e) => e.uid !== uid);
+  return { ...state, [key]: [...others, { ...moved, ...clampPosition(x, y) }] };
 }
 
-export function settleCoin(state, uid, from) {
-  if (state.solved || !state.pile.some((e) => e.uid === uid)) return state;
-  const pile = settlePile(state.pile, uid, from);
-  return pile === state.pile ? state : { ...state, pile };
+export function settleCoin(state, uid, from, key = "pile", compact = false) {
+  if (state.solved || !state[key].some((e) => e.uid === uid)) return state;
+  const list = settlePile(state[key], uid, from, pileHeightMm(state, key, compact));
+  return list === state[key] ? state : { ...state, [key]: list };
 }
 
-export function moveGroup(state, uids, dx, dy) {
+export function moveGroup(state, uids, dx, dy, key = "pile") {
   if (state.solved) return state;
   const wanted = new Set(uids);
-  const group = state.pile.filter((e) => wanted.has(e.uid));
+  const group = state[key].filter((e) => wanted.has(e.uid));
   if (group.length === 0) return state;
-  const limit = (d, key) => {
+  const limit = (d, axis) => {
     const v = Number.isNaN(d) ? 0 : d;
-    const lo = -0.5 - Math.min(...group.map((e) => e[key]));
-    const hi = 0.5 - Math.max(...group.map((e) => e[key]));
+    const lo = -0.5 - Math.min(...group.map((e) => e[axis]));
+    const hi = 0.5 - Math.max(...group.map((e) => e[axis]));
     return Math.min(hi, Math.max(lo, v));
   };
   const ddx = limit(dx, "x");
   const ddy = limit(dy, "y");
-  const others = state.pile.filter((e) => !wanted.has(e.uid));
+  const others = state[key].filter((e) => !wanted.has(e.uid));
   const shifted = group.map((e) => ({ ...e, x: e.x + ddx, y: e.y + ddy }));
-  return { ...state, pile: [...others, ...shifted] };
+  return { ...state, [key]: [...others, ...shifted] };
 }
 
-export function settleGroupCoins(state, uids, leaderUid, from) {
+export function settleGroupCoins(state, uids, leaderUid, from, key = "pile", compact = false) {
   if (state.solved) return state;
-  const pile = settleGroup(state.pile, uids, leaderUid, from);
-  return pile === state.pile ? state : { ...state, pile };
+  const list = settleGroup(state[key], uids, leaderUid, from, pileHeightMm(state, key, compact));
+  return list === state[key] ? state : { ...state, [key]: list };
 }
 
-export function clearPile(state) {
-  if (state.solved || state.mode === "cashier") return state;
-  return { ...state, pile: [], message: NO_MESSAGE };
+export function clearPile(state, key = "pile") {
+  if (locked(state, key)) return state;
+  return { ...state, [key]: [], message: NO_MESSAGE };
 }
 
 export function submitCheck(state, now) {

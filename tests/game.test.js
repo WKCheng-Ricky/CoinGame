@@ -14,6 +14,7 @@ import {
 import {
   randomHandful, placeHandfulCoin, checkAnswer, MAX_HANDFUL, STACK_CHANCE,
 } from "../src/game.js";
+import { rollScenario, priceFor, changeDue, judgeAnswer } from "../src/game.js";
 import { seeded, seq, pileOf } from "./pile-helper.js";
 
 function approx(a, b, tol = 1e-9) {
@@ -638,4 +639,113 @@ test("checkAnswer compares the answer with the pile total", () => {
 
 test("describePile accepts a custom intro", () => {
   assert.equal(describePile(pileOf("20p", "20p", "£1"), "On the counter"), "On the counter: 2 × 20p, 1 × £1");
+});
+
+const ODDS = { underpaid: 0.25, exactShare: 1 / 3 };
+
+test("rollScenario picks under, exact or over from the rng draws", () => {
+  assert.equal(rollScenario(ODDS, seq([0.24])), "under");
+  assert.equal(rollScenario(ODDS, seq([0.25, 0.32])), "exact");
+  assert.equal(rollScenario(ODDS, seq([0.25, 0.34])), "over");
+});
+
+test("rollScenario never gives under when underpaid is 0", () => {
+  assert.equal(rollScenario({ underpaid: 0, exactShare: 0.5 }, seq([0, 0.9])), "over");
+  assert.notEqual(rollScenario({ underpaid: 0, exactShare: 0.5 }, seq([0, 0.1])), "under");
+});
+
+test("rollScenario turns over into exact when paid is under 2", () => {
+  assert.equal(rollScenario(ODDS, seq([0.25, 0.34]), 1), "exact");
+  assert.equal(rollScenario(ODDS, seq([0.25, 0.34]), 2), "over");
+});
+
+test("priceFor follows the scenario rule", () => {
+  assert.equal(priceFor(500, "over", () => 0), 499);
+  assert.equal(priceFor(500, "under", () => 0), 501);
+  assert.equal(priceFor(500, "over", () => 0.999), 250);
+  assert.equal(priceFor(500, "under", () => 0.999), 700);
+  assert.equal(priceFor(500, "exact", () => 0.5), 500);
+  assert.equal(priceFor(2, "over", () => 0.999), 1);
+});
+
+test("changeDue is the overpayment, never negative", () => {
+  assert.equal(changeDue(500, 235), 265);
+  assert.equal(changeDue(235, 500), 0);
+});
+
+test("judgeAnswer covers every action and scenario", () => {
+  const ok = { correct: true, hint: "" };
+  const bad = (hint) => ({ correct: false, hint });
+  assert.deepEqual(judgeAnswer("over", "check", 265, 265), ok);
+  assert.deepEqual(judgeAnswer("over", "check", 266, 265), bad("Too much change"));
+  assert.deepEqual(judgeAnswer("over", "check", 264, 265), bad("Not enough change"));
+  assert.deepEqual(judgeAnswer("over", "check", 0, 265), bad("Not enough change"));
+  assert.deepEqual(judgeAnswer("exact", "check", 0, 0), bad("Does this customer need change?"));
+  assert.deepEqual(judgeAnswer("under", "check", 0, 0), bad("Does this customer need change?"));
+  assert.deepEqual(judgeAnswer("exact", "none", 0, 0), ok);
+  assert.deepEqual(judgeAnswer("over", "none", 0, 265), bad("They overpaid, so you owe change"));
+  assert.deepEqual(judgeAnswer("under", "none", 0, 0), bad("They have not paid enough yet"));
+  assert.deepEqual(judgeAnswer("under", "short", 0, 0), ok);
+  assert.deepEqual(judgeAnswer("exact", "short", 0, 0), bad("They paid enough"));
+  assert.deepEqual(judgeAnswer("over", "short", 0, 265), bad("They paid enough"));
+});
+
+import { CUSTOMER_BOX_MM, CHANGE_BOX_MM, heightForBox } from "../src/game.js";
+
+test("the box constants and heightForBox derive the play-area height from a box edge", () => {
+  assert.equal(CUSTOMER_BOX_MM, 40);
+  assert.equal(CHANGE_BOX_MM, 60);
+  approx(heightForBox(CUSTOMER_BOX_MM), 11.6);
+  approx(heightForBox(CHANGE_BOX_MM), 31.6);
+  approx(heightForBox(CUSTOMER_BOX_MM) + 2 * PILE_MARGIN_MM, 40);
+});
+
+test("with no heightMm placeCoin, settlePile and pileBox equal the 90 mm results", () => {
+  const coin = coinById("20p");
+  const pile = pileOf("20p", "1p");
+  assert.deepEqual(placeCoin(pile, coin, seeded(7)), placeCoin(pile, coin, seeded(7), PILE_HEIGHT_MM));
+  const close = [{ uid: 1, coinId: "20p", x: 0, y: 0, rot: 0 }, { uid: 2, coinId: "1p", x: 0, y: 0.02, rot: 0 }];
+  assert.deepEqual(settlePile(close, 2, null), settlePile(close, 2, null, PILE_HEIGHT_MM));
+  assert.deepEqual(pileBox({ x: 0.1, y: -0.2 }), pileBox({ x: 0.1, y: -0.2 }, PILE_HEIGHT_MM));
+});
+
+test("placeCoin with a short height keeps every centre inside the play area", () => {
+  const h = heightForBox(CUSTOMER_BOX_MM);
+  for (const v of [0, 0.999]) {
+    let pile = [];
+    for (let i = 0; i < 200; i++) {
+      const spot = placeCoin(pile, coinById("1p"), () => v, h);
+      assert.ok(Math.abs(spot.y) <= 0.5);
+      assert.ok(Math.abs(spot.y) * h <= h / 2);
+      pile = i < 5 ? [...pile, { uid: i, coinId: "1p", ...spot }] : pile;
+    }
+  }
+});
+
+test("pileBox places the bottom of the play area at the box edge for a given height", () => {
+  const h = heightForBox(CUSTOMER_BOX_MM);
+  approx(h + 2 * PILE_MARGIN_MM, 40);
+  approx(pileBox({ x: 0, y: 0.5 }, h).top, ((PILE_MARGIN_MM + 1 * h) / (h + 2 * PILE_MARGIN_MM)) * 100);
+});
+
+test("settlePile and detachNudge measure the y axis in the given height", () => {
+  const h = heightForBox(CHANGE_BOX_MM);
+  const pile = [{ uid: 1, coinId: "20p", x: 0, y: 0, rot: 0 }, { uid: 2, coinId: "1p", x: 0, y: 0.02, rot: 0 }];
+  const out = settlePile(pile, 2, null, h);
+  const want = PUSH_FACTOR * (coinById("20p").diameter / 2 + coinById("1p").diameter / 2);
+  approx(Math.abs(out[1].y - out[0].y) * h, want, 1e-6);
+  const n = detachNudge({ x: 0.2, y: -0.2 }, h);
+  approx(n.y, -0.2 + DETACH_NUDGE_MM.y / h);
+});
+
+test("unitUids and stackCounts measure the link distance in the given height", () => {
+  // 0.2 apart in y: 18 mm in a 90 mm area (separate), 2.32 mm in an 11.6 mm area (stacked)
+  const h = heightForBox(CUSTOMER_BOX_MM);
+  const pile = [coinAt(1, "20p", 0, 0), coinAt(2, "20p", 0, 0.2)];
+  assert.deepEqual(unitUids(pile, 1), [1]);
+  assert.deepEqual(unitUids(pile, 1, PILE_HEIGHT_MM), [1]);
+  assert.deepEqual(unitUids(pile, 1, h), [1, 2]);
+  assert.equal(stackCounts(pile).size, 0);
+  assert.equal(stackCounts(pile, PILE_HEIGHT_MM).size, 0);
+  assert.deepEqual([...stackCounts(pile, h)], [[2, 2]]);
 });

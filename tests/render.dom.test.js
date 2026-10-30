@@ -122,3 +122,28 @@ test("announce clears then re-sets text after a delay", withDom((t, { document }
   t.mock.timers.tick(1);
   assert.equal(el.textContent, "new");
 }));
+
+import { PILE_MARGIN_MM } from "../src/game.js";
+
+test("renderPile sets --pile-h-mm from the given height and defaults to 90", withDom((t, { document }) => {
+  const c = document.createElement("div");
+  renderPile(c, [entry(1, "20p", 0, 0)]);
+  assert.equal(Number(c.style.getPropertyValue("--pile-h-mm")), 90 + 2 * PILE_MARGIN_MM);
+  renderPile(c, [entry(1, "20p", 0, 0.5)], null, true, 11.6);
+  assert.ok(Math.abs(Number(c.style.getPropertyValue("--pile-h-mm")) - (11.6 + 2 * PILE_MARGIN_MM)) < 1e-9);
+  assert.equal(c.children[0].style.top, `${((PILE_MARGIN_MM + 11.6) / (11.6 + 2 * PILE_MARGIN_MM)) * 100}%`);
+}));
+
+test("renderPile and showStackBadges link stacks in the given height", withDom((t, { document }) => {
+  // y-fractions 0.2 apart: separate at 90 mm, a stack of 2 at 11.6 mm
+  const pile = [entry(1, "20p", 0, 0), entry(2, "20p", 0, 0.2)];
+  const c = document.createElement("div");
+  renderPile(c, pile);
+  assert.equal(c.querySelectorAll(".stack-badge").length, 0);
+  renderPile(c, pile, null, true, 11.6);
+  assert.equal(c.querySelector(".stack-badge")?.textContent, "×2");
+  showStackBadges(c, pile, null);
+  assert.equal(c.querySelectorAll(".stack-badge").length, 0);
+  showStackBadges(c, pile, null, 11.6);
+  assert.equal(c.querySelector(".stack-badge")?.textContent, "×2");
+}));

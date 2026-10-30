@@ -93,7 +93,7 @@ test("433x771: the Endless pile card and the whole Home screen need no scrolling
   await page.locator("#btn-endless").click();
   const over = await page.locator(".content").evaluate((el) => el.scrollHeight - el.clientHeight);
   expect(over).toBeLessThanOrEqual(0);
-  await expect(page.locator(".pile-area")).toBeInViewport({ ratio: 1 });
+  await expect(page.locator(".pile-area:not([hidden])")).toBeInViewport({ ratio: 1 });
 });
 
 test("1440x960: dragging a tray coin to the pile drops it where it was released (fixed ghost)", async ({ page }) => {

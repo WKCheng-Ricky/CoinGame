@@ -8,7 +8,7 @@ Play it live on https://wkcheng-ricky.github.io/CoinGame/
 
 ## Highlights
 
-- **Three game modes:** Endless, Custom and Cashier.
+- **Four game modes:** Endless, Custom, Cashier and Give Change.
 - **Two difficulties:** Easy shows coin values and your running total; Normal hides them.
 - **Hands-on coins:** tap, drag and stack coins. Same coins stack and show a count.
 - **Realistic coins:** real sizes, shapes and wording, plus a 1 cm reference grid so
@@ -24,6 +24,7 @@ Play it live on https://wkcheng-ricky.github.io/CoinGame/
 | **Endless** | Build random targets from £0.01 to £9.99, one after another. Press Back to stop. |
 | **Custom** | Type an amount (up to £99.99) and build it with any coins. |
 | **Cashier** | A customer's coins are on the counter. Add them up, type the total and press Check. Next brings the next customer. |
+| **Give Change** | A customer pays for an item. Build their change from the tray and press Check, or press **No change** if they paid exactly or **Not enough!** if they paid too little (Normal only). Next brings the next customer. |
 
 Pick a mode and a difficulty on Home; one tap on a mode starts it.
 
@@ -36,6 +37,14 @@ Pick a mode and a difficulty on Home; one tap on a mode starts it.
 - Press **Check** or **Enter** when the total matches. Ctrl/Cmd+Enter works even while a coin or button has focus.
 
 In Cashier, counter coins can be dragged but not added or removed, and Enter in the amount field checks too.
+
+In Give Change, the customer's coins sit in the top bar under the price, in a 4 cm strip; they can be dragged apart but
+not added or removed. Below is the "Your change" card with a 6 cm pile (4 cm on screens shorter than 700 px, such
+as an iPhone SE or a landscape phone): tray coins go there and are tapped, dragged and stacked as in Endless, and
+**Not enough!** and **No change** sit under it. The tray, Check and Clear are at the bottom, as in Endless; Clear
+empties only your change. Every pile and the tray use the same coin size. On a portrait phone (375 × 667 and up) the
+screen fits without scrolling; in a short landscape window the middle scrolls. Easy shows the running total of your
+change and never underpays.
 
 ## Quick start
 
@@ -71,7 +80,7 @@ number of milliseconds from 0 to 10000.
 | --- | --- | --- |
 | `dwell` | How long a coin is held before its value shows | |
 | `hold` | How long a coin is held to separate it from a stack | `0` detaches instantly, so stacks cannot be dragged as a group |
-| `advance` | Guard after a correct Cashier answer before Next works | `0` removes the double-press guard |
+| `advance` | Guard after a correct Cashier or Give Change answer before Next works | `0` removes the double-press guard |
 
 ## Deploy
 

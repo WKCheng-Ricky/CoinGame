@@ -9,12 +9,12 @@ async function openHome(page) {
   await expect(page.locator("#screen-home")).toBeVisible();
 }
 
-test("the Choose a game box holds exactly the three mode buttons", async ({ page }) => {
+test("the Choose a game box holds exactly the four mode buttons", async ({ page }) => {
   await openHome(page);
   const box = page.locator("fieldset.choice", { has: page.locator("legend", { hasText: "Choose a game" }) });
   await expect(box).toHaveCount(1);
-  await expect(box.locator("button")).toHaveText(["Endless", "Custom", "Cashier"]);
-  await expect(box.locator("#btn-endless, #btn-custom, #btn-cashier")).toHaveCount(3);
+  await expect(box.locator("button")).toHaveText(["Endless", "Custom", "Cashier", "Give Change"]);
+  await expect(box.locator("#btn-endless, #btn-custom, #btn-cashier, #btn-give-change")).toHaveCount(4);
 });
 
 test("each mode button still opens its mode on one click", async ({ page }) => {
