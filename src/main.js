@@ -1,6 +1,6 @@
-import { describePile, detachNudge, formatPence, parseAmount, randomTarget, total, unitUids } from "./game.js";
+import { describePile, detachNudge, formatPence, getCoinScale, parseAmount, randomTarget, setCoinScale, total, unitUids } from "./game.js";
 import { createDwell } from "./dwell.js";
-import { giveChangeOdds, timingFromSearch } from "./config.js";
+import { coinScaleFor, giveChangeOdds, timingFromSearch } from "./config.js";
 import { mountHome } from "./home.js";
 import { createDrag, createTrayDrag } from "./drag.js";
 import { isCheckShortcut } from "./keys.js";
@@ -221,8 +221,20 @@ function render() {
   home.update(state.mode, state.options);
 }
 
+// Large Coins changes every coin's size: set the scale before anything is placed, and redraw the coins.
+function applyCoinScale(options) {
+  const k = coinScaleFor(options);
+  if (k === getCoinScale()) return;
+  setCoinScale(k);
+  document.documentElement.style.setProperty("--coin-scale", k);
+  renderTray($("play-tray"));
+  shownPile = undefined;
+  shownChange = undefined;
+}
+
 function update(next) {
   state = next;
+  applyCoinScale(state.options);
   render();
 }
 

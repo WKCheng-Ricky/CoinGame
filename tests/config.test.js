@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { TIMING_DEFAULTS, giveChangeOdds, timingFromSearch } from "../src/config.js";
+import { LARGE_COIN_SCALE, TIMING_DEFAULTS, coinScaleFor, giveChangeOdds, timingFromSearch } from "../src/config.js";
 
 test("defaults when the search is empty", () => {
   assert.deepEqual(TIMING_DEFAULTS, { dwellMs: 2000, detachHoldMs: 1000, advanceDelayMs: 400 });
@@ -32,4 +32,14 @@ test("giveChangeOdds underpays 25% of customers with Short-paying customers on",
 
 test("giveChangeOdds never underpays with Short-paying customers off", () => {
   assert.deepEqual(giveChangeOdds({ shortPay: false }), { underpaid: 0, exactShare: 1 / 3 });
+});
+
+test("coinScaleFor is 1 normally and LARGE_COIN_SCALE with Large Coins", () => {
+  assert.equal(coinScaleFor({ largeCoins: false }), 1);
+  assert.equal(coinScaleFor({}), 1);
+  assert.equal(coinScaleFor({ largeCoins: true }), LARGE_COIN_SCALE);
+});
+
+test("LARGE_COIN_SCALE makes coins bigger", () => {
+  assert.ok(LARGE_COIN_SCALE > 1);
 });

@@ -1,8 +1,8 @@
 import { COINS } from "./coins.js";
 import { MODE_IDS, defaultOptions, isOptionId } from "./options.js";
 import {
-  CHANGE_BOX_COMPACT_MM, CHANGE_BOX_MM, CUSTOMER_BOX_COMPACT_MM, CUSTOMER_BOX_MM, PILE_HEIGHT_MM, changeDue, check, checkAnswer, clampPosition, formatPence,
-  heightForBox, judgeAnswer, placeCoin, placeHandfulCoin, priceFor, randomHandful, rollScenario, settlePile,
+  CHANGE_BOX_COMPACT_MM, CUSTOMER_BOX_COMPACT_MM, changeDue, check, checkAnswer, clampPosition, formatPence,
+  changeBoxMm, customerBoxMm, heightForBox, judgeAnswer, pileHeightDefaultMm, placeCoin, placeHandfulCoin, priceFor, randomHandful, rollScenario, settlePile,
   settleGroup, total,
 } from "./game.js";
 
@@ -40,9 +40,9 @@ export function nextRound(state, target) {
 // Play-area height of a pile: Give Change mode gives the customer's and the player's piles short boxes.
 // `compact` (a short screen, from the UI) shrinks both piles to 4 cm boxes.
 export function pileHeightMm(state, key = "pile", compact = false) {
-  if (state.mode !== "give-change") return PILE_HEIGHT_MM;
-  if (key !== "change") return heightForBox(compact ? CUSTOMER_BOX_COMPACT_MM : CUSTOMER_BOX_MM);
-  return heightForBox(compact ? CHANGE_BOX_COMPACT_MM : CHANGE_BOX_MM);
+  if (state.mode !== "give-change") return pileHeightDefaultMm();
+  if (key !== "change") return heightForBox(compact ? CUSTOMER_BOX_COMPACT_MM : customerBoxMm());
+  return heightForBox(compact ? CHANGE_BOX_COMPACT_MM : changeBoxMm());
 }
 
 function placeAndSettle(state, coin, place, rng, key = "pile", compact = false) {

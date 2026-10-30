@@ -27,3 +27,7 @@ export function timingFromSearch(search) {
 export function giveChangeOdds(options) {
   return { underpaid: options.shortPay ? 0.25 : 0, exactShare: 1 / 3 };
 }
+
+// Large Coins option: how much bigger every coin is drawn, with the pile box keeping its size on screen. Tune here.
+export const LARGE_COIN_SCALE = 1.5;
+export const coinScaleFor = (options) => (options.largeCoins ? LARGE_COIN_SCALE : 1);

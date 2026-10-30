@@ -153,3 +153,24 @@ test("renderPile and showStackBadges link stacks in the given height", withDom((
   showStackBadges(c, pile, null, 11.6);
   assert.equal(c.querySelector(".stack-badge")?.textContent, "×2");
 }));
+
+import { setCoinScale } from "../src/game.js";
+
+test("at scale 1.5 coins carry the scaled --d and the box custom properties do not change", withDom((t, { document }) => {
+  const coin = COINS.find((c) => c.id === "20p");
+  const flat = document.createElement("div");
+  renderPile(flat, [entry(1, "20p")], null, true, 40);
+  setCoinScale(1.5);
+  try {
+    const big = document.createElement("div");
+    renderPile(big, [entry(1, "20p")], null, true, 40);
+    assert.equal(Number(big.children[0].style.getPropertyValue("--d")), 1.5 * coin.diameter);
+    assert.equal(flat.children[0].style.getPropertyValue("--d"), String(coin.diameter));
+    assert.equal(big.style.getPropertyValue("--pile-w-mm"), flat.style.getPropertyValue("--pile-w-mm"));
+    const tray = document.createElement("div");
+    renderTray(tray);
+    assert.equal(Number(tray.children[0].style.getPropertyValue("--d")), 1.5 * COINS[0].diameter);
+  } finally {
+    setCoinScale(1);
+  }
+}));

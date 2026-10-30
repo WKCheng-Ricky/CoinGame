@@ -1,6 +1,6 @@
 import { COINS } from "./coins.js";
 import { arcLetters, fitFont, polygonPoints, reuleauxPath, shapeRadiusAt } from "./shapes.js";
-import { PILE_HEIGHT_MM, PILE_MARGIN_MM, PILE_WIDTH_MM, pileBox, stackCounts } from "./game.js";
+import { PILE_MARGIN_MM, PILE_WIDTH_MM, diameterOf, pileBox, pileHeightDefaultMm, pileMarginMm, stackCounts } from "./game.js";
 
 
 // Layout of one face, in viewBox units (the body is 92 wide, its rim line 70 wide).
@@ -128,7 +128,7 @@ function coinButton(coin, className, ariaLabel, extraHtml = "") {
   btn.className = className;
   btn.dataset.coin = coin.id;
   btn.setAttribute("aria-label", ariaLabel);
-  btn.style.setProperty("--d", coin.diameter);
+  btn.style.setProperty("--d", diameterOf(coin));
   btn.innerHTML = coinSvg(coin) + extraHtml;
   return btn;
 }
@@ -141,9 +141,9 @@ export function coinLabel(coin, removable) {
   return removable ? `Remove ${coin.label}` : `${coin.label} coin`;
 }
 
-export function renderPile(container, pile, excludeUid = null, removable = true, heightMm = PILE_HEIGHT_MM) {
-  container.style.setProperty("--pile-w-mm", PILE_WIDTH_MM + 2 * PILE_MARGIN_MM);
-  container.style.setProperty("--pile-h-mm", heightMm + 2 * PILE_MARGIN_MM);
+export function renderPile(container, pile, excludeUid = null, removable = true, heightMm = pileHeightDefaultMm()) {
+  container.style.setProperty("--pile-w-mm", PILE_WIDTH_MM + 2 * PILE_MARGIN_MM); // the box keeps its size at any coin scale
+  container.style.setProperty("--pile-h-mm", heightMm + 2 * pileMarginMm());
   const existing = new Map([...container.children].map((el) => [el.dataset.uid, el]));
   const live = new Set(pile.map((e) => String(e.uid)));
   for (const [uid, el] of existing) {
@@ -173,7 +173,7 @@ export function renderPile(container, pile, excludeUid = null, removable = true,
 }
 
 // excludeUid (a detached coin) does not count: it gets no badge and its former stack shows the reduced count
-export function showStackBadges(container, pile, excludeUid = null, heightMm = PILE_HEIGHT_MM) {
+export function showStackBadges(container, pile, excludeUid = null, heightMm = pileHeightDefaultMm()) {
   const counts = stackCounts(excludeUid === null ? pile : pile.filter((e) => e.uid !== excludeUid), heightMm);
   for (const btn of container.children) {
     const uid = Number(btn.dataset.uid);

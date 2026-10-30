@@ -49,18 +49,18 @@ test("update draws four mode radios, selects the current one and links each blur
 
 test("the options list follows the selected mode", withHome(({ document, home }) => {
   home.update("endless", OPTS);
-  assert.deepEqual(boxes(document).map((b) => b.dataset.option), ["showCoins"]);
+  assert.deepEqual(boxes(document).map((b) => b.dataset.option), ["showCoins", "largeCoins"]);
   assert.equal(boxes(document)[0].checked, false);
   home.update("give-change", OPTS);
-  assert.deepEqual(boxes(document).map((b) => b.dataset.option), ["showCoins", "shortPay"]);
-  assert.equal(boxes(document)[1].checked, true);
+  assert.deepEqual(boxes(document).map((b) => b.dataset.option), ["showCoins", "largeCoins", "shortPay"]);
+  assert.equal(boxes(document)[2].checked, true);
 }));
 
 test("option values survive switching modes", withHome(({ document, home }) => {
-  home.update("endless", { showCoins: true, shortPay: false });
+  home.update("endless", { showCoins: true, largeCoins: false, shortPay: false });
   assert.equal(boxes(document)[0].checked, true);
-  home.update("give-change", { showCoins: true, shortPay: false });
-  assert.deepEqual(boxes(document).map((b) => b.checked), [true, false]);
+  home.update("give-change", { showCoins: true, largeCoins: false, shortPay: false });
+  assert.deepEqual(boxes(document).map((b) => b.checked), [true, false, false]);
 }));
 
 test("an update in the same mode keeps the focused checkbox", withHome(({ document, home }) => {
@@ -75,9 +75,9 @@ test("an update in the same mode keeps the focused checkbox", withHome(({ docume
 
 test("each option label carries its hint as a title and a described-by help line", withHome(({ document, home }) => {
   home.update("give-change", OPTS);
-  const label = boxes(document)[1].closest("label");
+  const label = boxes(document)[2].closest("label");
   assert.equal(label.title, "Customers may not pay enough");
-  assert.equal(document.getElementById(boxes(document)[1].getAttribute("aria-describedby")).textContent, label.title);
+  assert.equal(document.getElementById(boxes(document)[2].getAttribute("aria-describedby")).textContent, label.title);
 }));
 
 test("a radio change calls onMode, a checkbox change calls onOption, Play calls onPlay with the mode", withHome(({ window, document, home, calls }) => {

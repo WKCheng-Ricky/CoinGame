@@ -2,17 +2,17 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { MODE_IDS, OPTIONS, defaultOptions, isOptionId, optionsFor } from "../src/options.js";
 
-test("defaultOptions gives Show Coins off and Short-paying customers on", () => {
-  assert.deepEqual(defaultOptions(), { showCoins: false, shortPay: true });
+test("defaultOptions gives Show Coins and Large Coins off and Short-paying customers on", () => {
+  assert.deepEqual(defaultOptions(), { showCoins: false, largeCoins: false, shortPay: true });
 });
 
 test("optionsFor lists the global options, then the ones scoped to the mode", () => {
-  assert.deepEqual(optionsFor("endless").map((o) => o.id), ["showCoins"]);
-  assert.deepEqual(optionsFor("give-change").map((o) => o.id), ["showCoins", "shortPay"]);
+  assert.deepEqual(optionsFor("endless").map((o) => o.id), ["showCoins", "largeCoins"]);
+  assert.deepEqual(optionsFor("give-change").map((o) => o.id), ["showCoins", "largeCoins", "shortPay"]);
 });
 
 test("optionsFor an unknown mode gives the global options only", () => {
-  assert.deepEqual(optionsFor("nope").map((o) => o.id), ["showCoins"]);
+  assert.deepEqual(optionsFor("nope").map((o) => o.id), ["showCoins", "largeCoins"]);
 });
 
 test("MODE_IDS lists the four modes in menu order", () => {

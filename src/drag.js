@@ -1,10 +1,10 @@
 import { COINS } from "./coins.js";
-import { PILE_WIDTH_MM, PILE_HEIGHT_MM, PILE_MARGIN_MM } from "./game.js";
+import { PILE_WIDTH_MM, PILE_HEIGHT_MM, PILE_MARGIN_MM, diameterOf, pileHeightDefaultMm, pileMarginMm, pileWidthMm } from "./game.js";
 
 export const DRAG_THRESHOLD_PX = 6;
 
 // The pile box (centre area plus a margin on each side), as laid out by pileBox.
-const BOX_W_MM = PILE_WIDTH_MM + 2 * PILE_MARGIN_MM;
+const BOX_W_MM = PILE_WIDTH_MM + 2 * PILE_MARGIN_MM; // the box keeps this size at any coin scale
 
 export function passesThreshold(dx, dy) {
   return Math.hypot(dx, dy) > DRAG_THRESHOLD_PX;
@@ -16,13 +16,13 @@ export function pointInRect({ x, y }, { left, top, width, height }) {
 
 // Rendered coin diameter in px for a pile box of the given width.
 export function coinSizePx(coin, pileRect) {
-  return (coin.diameter / BOX_W_MM) * pileRect.width;
+  return (diameterOf(coin) / BOX_W_MM) * pileRect.width;
 }
 
 // Inverse of pileBox: maps a viewport point to pile fractions. Unclamped.
-export function toPileFraction({ x: px, y: py }, rect, heightMm = PILE_HEIGHT_MM) {
-  const x = (((px - rect.left) / rect.width) * BOX_W_MM - PILE_MARGIN_MM) / PILE_WIDTH_MM - 0.5;
-  const y = (((py - rect.top) / rect.height) * (heightMm + 2 * PILE_MARGIN_MM) - PILE_MARGIN_MM) / heightMm - 0.5;
+export function toPileFraction({ x: px, y: py }, rect, heightMm = pileHeightDefaultMm()) {
+  const x = (((px - rect.left) / rect.width) * BOX_W_MM - pileMarginMm()) / pileWidthMm() - 0.5;
+  const y = (((py - rect.top) / rect.height) * (heightMm + 2 * pileMarginMm()) - pileMarginMm()) / heightMm - 0.5;
   return { x, y };
 }
 
@@ -30,10 +30,10 @@ export function toPileFraction({ x: px, y: py }, rect, heightMm = PILE_HEIGHT_MM
 export const DETACH_HOLD_MS = 1000;
 
 // A pixel delta as a pile-fraction delta (the linear part of toPileFraction).
-export function pixelsToFraction(dxPx, dyPx, rect, heightMm = PILE_HEIGHT_MM) {
+export function pixelsToFraction(dxPx, dyPx, rect, heightMm = pileHeightDefaultMm()) {
   return {
-    x: ((dxPx / rect.width) * BOX_W_MM) / PILE_WIDTH_MM,
-    y: ((dyPx / rect.height) * (heightMm + 2 * PILE_MARGIN_MM)) / heightMm,
+    x: ((dxPx / rect.width) * BOX_W_MM) / pileWidthMm(),
+    y: ((dyPx / rect.height) * (heightMm + 2 * pileMarginMm())) / heightMm,
   };
 }
 
@@ -65,7 +65,7 @@ function makeGhost(m) {
 // drag; otherwise the drag is drawn as body ghosts, asked again on every move (to highlight
 // the other pile) and at the release, where another pile's el calls onTransfer instead of
 // onMove / onMoveGroup.
-export function createDrag(container, { onMove, onMoveGroup, getGroup, onDragStart, isLocked, onDetach, onDetachEnd, onDetachRelease, holdMs = DETACH_HOLD_MS, heightMm = PILE_HEIGHT_MM, dropTarget, onTransfer }) {
+export function createDrag(container, { onMove, onMoveGroup, getGroup, onDragStart, isLocked, onDetach, onDetachEnd, onDetachRelease, holdMs = DETACH_HOLD_MS, heightMm = pileHeightDefaultMm(), dropTarget, onTransfer }) {
   const height = () => (typeof heightMm === "function" ? heightMm() : heightMm);
   let suppress = false;
   // { id, type, el, uid, uids, members, startX, startY, offX, offY, dragging, group, single, timer, ghosts, over }
@@ -253,7 +253,7 @@ export function createDrag(container, { onMove, onMoveGroup, getGroup, onDragSta
 
 // pileEl is the drop target, or a function returning it (resolved on every pointer event);
 // heightMm is its play-area height, a number or a function (resolved at the drop)
-export function createTrayDrag(container, { onDrop, onDragStart, isLocked, pileEl, heightMm = PILE_HEIGHT_MM }) {
+export function createTrayDrag(container, { onDrop, onDragStart, isLocked, pileEl, heightMm = pileHeightDefaultMm() }) {
   const target = () => (typeof pileEl === "function" ? pileEl() : pileEl);
   const height = () => (typeof heightMm === "function" ? heightMm() : heightMm);
   let suppress = false;
