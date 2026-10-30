@@ -117,15 +117,34 @@ export function judgeAnswer(scenario, action, changeTotal, due) {
 export const PILE_WIDTH_MM = 110;
 export const PILE_HEIGHT_MM = 90;
 export const PILE_MARGIN_MM = Math.max(...COINS.map((c) => c.diameter)) / 2;
+
+// Large Coins: every coin is drawn and laid out `coinScale` times bigger while the pile box keeps its width on
+// screen, so the play area (the box less a margin of one big coin's radius on each side) holds fewer coins.
+let coinScale = 1;
+export function setCoinScale(k) { coinScale = k; }
+export const getCoinScale = () => coinScale;
+export const diameterOf = (coin) => coin.diameter * coinScale;
+export const pileMarginMm = () => PILE_MARGIN_MM * coinScale;
+export const pileWidthMm = () => PILE_WIDTH_MM + 2 * PILE_MARGIN_MM - 2 * pileMarginMm();
 export const CUSTOMER_BOX_MM = 50;
 export const CHANGE_BOX_MM = 50;
+// Large Coins: the default pile box and both Give Change boxes are a whole number of grid cells high
+// (a cell is 10 mm of coin, so 10 * coinScale box-mm), a little shorter than the base boxes.
+export const LARGE_BOX_CELLS = { pile: 7, change: 3, customer: 3 };
+const largeBoxMm = (cells) => cells * 10 * coinScale;
+export const pileBoxMm = () => (coinScale > 1 ? largeBoxMm(LARGE_BOX_CELLS.pile) : PILE_HEIGHT_MM + 2 * PILE_MARGIN_MM);
+export const changeBoxMm = () => (coinScale > 1 ? largeBoxMm(LARGE_BOX_CELLS.change) : CHANGE_BOX_MM);
+export const customerBoxMm = () => (coinScale > 1 ? largeBoxMm(LARGE_BOX_CELLS.customer) : CUSTOMER_BOX_MM);
+export const pileHeightDefaultMm = () => pileBoxMm() - 2 * pileMarginMm();
 // both piles shrink on short screens (under 700 px high), so the Give Change screen still fits
 export const CUSTOMER_BOX_COMPACT_MM = 40;
 export const CHANGE_BOX_COMPACT_MM = 40;
 
 // Play-area height for a pile box of the given edge length.
+// Never below MIN_PLAY_HEIGHT_MM: a big coin scale can leave a short box no room, and a negative height flips the axis.
+export const MIN_PLAY_HEIGHT_MM = 1;
 export function heightForBox(boxMm) {
-  return boxMm - 2 * PILE_MARGIN_MM;
+  return Math.max(MIN_PLAY_HEIGHT_MM, boxMm - 2 * pileMarginMm());
 }
 
 export const CLUSTER_TRIES = 20;
@@ -134,14 +153,14 @@ export const MAX_PLACEMENT_TRIES = 60;
 function clearanceAt(pile, x, y, radius, heightMm) {
   let min = Infinity;
   for (const e of pile) {
-    const d = Math.hypot((x - e.x) * PILE_WIDTH_MM, (y - e.y) * heightMm);
+    const d = Math.hypot((x - e.x) * pileWidthMm(), (y - e.y) * heightMm);
     min = Math.min(min, d - radius);
   }
   return min;
 }
 
-export function placeCoin(pile, coin, rng = Math.random, heightMm = PILE_HEIGHT_MM) {
-  const radius = coin.diameter / 2;
+export function placeCoin(pile, coin, rng = Math.random, heightMm = pileHeightDefaultMm()) {
+  const radius = diameterOf(coin) / 2;
   let best = null;
   let found = null;
   for (let i = 0; i < MAX_PLACEMENT_TRIES && !found; i++) {
@@ -159,7 +178,7 @@ export function placeCoin(pile, coin, rng = Math.random, heightMm = PILE_HEIGHT_
 
 export const STACK_CHANCE = 0.25;
 
-export function placeHandfulCoin(pile, coin, rng = Math.random, heightMm = PILE_HEIGHT_MM) {
+export function placeHandfulCoin(pile, coin, rng = Math.random, heightMm = pileHeightDefaultMm()) {
   const same = pile.filter((e) => e.coinId === coin.id);
   if (same.length > 0 && rng() < STACK_CHANCE) {
     const target = same[Math.floor(rng() * same.length)];
@@ -168,12 +187,12 @@ export function placeHandfulCoin(pile, coin, rng = Math.random, heightMm = PILE_
   return placeCoin(pile, coin, rng, heightMm);
 }
 
-export function pileBox({ x, y }, heightMm = PILE_HEIGHT_MM) {
-  const boxW = PILE_WIDTH_MM + 2 * PILE_MARGIN_MM;
-  const boxH = heightMm + 2 * PILE_MARGIN_MM;
+export function pileBox({ x, y }, heightMm = pileHeightDefaultMm()) {
+  const boxW = pileWidthMm() + 2 * pileMarginMm();
+  const boxH = heightMm + 2 * pileMarginMm();
   return {
-    left: ((PILE_MARGIN_MM + (0.5 + x) * PILE_WIDTH_MM) / boxW) * 100,
-    top: ((PILE_MARGIN_MM + (0.5 + y) * heightMm) / boxH) * 100,
+    left: ((pileMarginMm() + (0.5 + x) * pileWidthMm()) / boxW) * 100,
+    top: ((pileMarginMm() + (0.5 + y) * heightMm) / boxH) * 100,
   };
 }
 
@@ -191,21 +210,21 @@ export const STACK_LINK_MM = 3;
 export const DETACH_NUDGE_MM = { x: 5, y: 5 };
 
 // Where a held, released coin steps to: each axis towards the pile centre (positive at 0).
-export function detachNudge(entry, heightMm = PILE_HEIGHT_MM) {
+export function detachNudge(entry, heightMm = pileHeightDefaultMm()) {
   const dx = entry.x <= 0 ? DETACH_NUDGE_MM.x : -DETACH_NUDGE_MM.x;
   const dy = entry.y <= 0 ? DETACH_NUDGE_MM.y : -DETACH_NUDGE_MM.y;
-  return clampPosition(entry.x + dx / PILE_WIDTH_MM, entry.y + dy / heightMm);
+  return clampPosition(entry.x + dx / pileWidthMm(), entry.y + dy / heightMm);
 }
 
 export const PUSH_FACTOR = 0.75;
 export const MAX_SETTLE_PASSES = 8;
 
 function distMm(a, b, heightMm) {
-  return Math.hypot((a.x - b.x) * PILE_WIDTH_MM, (a.y - b.y) * heightMm);
+  return Math.hypot((a.x - b.x) * pileWidthMm(), (a.y - b.y) * heightMm);
 }
 
 function radiusOf(entry) {
-  return coinById(entry.coinId).diameter / 2;
+  return diameterOf(coinById(entry.coinId)) / 2;
 }
 
 // b is reacted to by a when it is too close and a moved towards it (or a is new).
@@ -216,7 +235,7 @@ function reactsTo(a, prev, b, heightMm) {
 }
 
 // The connected component of same-denomination coins around `start`.
-function unitOf(cur, start, heightMm = PILE_HEIGHT_MM) {
+function unitOf(cur, start, heightMm = pileHeightDefaultMm()) {
   const unit = new Set([start]);
   const queue = [start];
   while (queue.length > 0) {
@@ -234,7 +253,7 @@ function unitOf(cur, start, heightMm = PILE_HEIGHT_MM) {
 function shiftUnit(unit, dxMm, dyMm, next, heightMm) {
   for (const e of unit) {
     if (!next.has(e)) next.set(e, { x: e.x, y: e.y });
-    Object.assign(e, clampPosition(e.x + dxMm / PILE_WIDTH_MM, e.y + dyMm / heightMm));
+    Object.assign(e, clampPosition(e.x + dxMm / pileWidthMm(), e.y + dyMm / heightMm));
   }
 }
 
@@ -267,7 +286,7 @@ function settleEntries(cur, members, leader, from, heightMm) {
     const top = others.findLast((c) => unit.has(c));
     members.forEach((e, i) => {
       Object.assign(e, clampPosition(
-        top.x + ((i + 1) * STACK_STEP_MM.x) / PILE_WIDTH_MM,
+        top.x + ((i + 1) * STACK_STEP_MM.x) / pileWidthMm(),
         top.y + ((i + 1) * STACK_STEP_MM.y) / heightMm,
       ));
       e.rot = top.rot;
@@ -283,7 +302,7 @@ function settleEntries(cur, members, leader, from, heightMm) {
         const d = distMm(a, b, heightMm);
         const need = PUSH_FACTOR * (radiusOf(a) + radiusOf(b)) - d;
         if (need <= 0) continue;
-        const ux = d === 0 ? 1 : ((a.x - b.x) * PILE_WIDTH_MM) / d;
+        const ux = d === 0 ? 1 : ((a.x - b.x) * pileWidthMm()) / d;
         const uy = d === 0 ? 0 : ((a.y - b.y) * heightMm) / d;
         const half = need / 2;
         const unitA = unitOf(cur, a, heightMm);
@@ -301,7 +320,7 @@ function settled(pile, cur) {
   return changed ? cur : pile;
 }
 
-export function settlePile(pile, uid, from, heightMm = PILE_HEIGHT_MM) {
+export function settlePile(pile, uid, from, heightMm = pileHeightDefaultMm()) {
   const cur = pile.map((e) => ({ ...e }));
   const m = cur.find((e) => e.uid === uid);
   if (!m) return pile;
@@ -309,7 +328,7 @@ export function settlePile(pile, uid, from, heightMm = PILE_HEIGHT_MM) {
   return settled(pile, cur);
 }
 
-export function settleGroup(pile, uids, leaderUid, from, heightMm = PILE_HEIGHT_MM) {
+export function settleGroup(pile, uids, leaderUid, from, heightMm = pileHeightDefaultMm()) {
   const wanted = new Set(uids);
   const cur = pile.map((e) => ({ ...e }));
   const members = cur.filter((e) => wanted.has(e.uid));
@@ -320,7 +339,7 @@ export function settleGroup(pile, uids, leaderUid, from, heightMm = PILE_HEIGHT_
 }
 
 // Uids of the stack containing `uid`, in draw order ([] when unknown).
-export function unitUids(pile, uid, heightMm = PILE_HEIGHT_MM) {
+export function unitUids(pile, uid, heightMm = pileHeightDefaultMm()) {
   const start = pile.find((e) => e.uid === uid);
   if (!start) return [];
   const unit = unitOf(pile, start, heightMm);
@@ -328,7 +347,7 @@ export function unitUids(pile, uid, heightMm = PILE_HEIGHT_MM) {
 }
 
 // Uid of the last-drawn member of each stack of two or more, mapped to the stack size.
-export function stackCounts(pile, heightMm = PILE_HEIGHT_MM) {
+export function stackCounts(pile, heightMm = pileHeightDefaultMm()) {
   const counts = new Map();
   const seen = new Set();
   for (const e of pile) {

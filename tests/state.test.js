@@ -24,7 +24,7 @@ test("createState has the expected shape", () => {
   assert.deepEqual(createState(), {
     mode: "endless", target: 0, pile: [], nextUid: 1, rounds: 0, solved: false, solvedAt: 0,
     message: { text: "", kind: "" },
-    options: { showCoins: false, shortPay: true },
+    options: { showCoins: false, largeCoins: false, shortPay: true },
     change: [], price: 0, scenario: "", paid: 0, dealt: [],
   });
   assert.equal(ADVANCE_DELAY_MS, 400);
@@ -1028,4 +1028,19 @@ test("nextGiveChangeCustomer avoids repeating the dealt handful even when the cu
   const s = { ...base, pile: [], change: base.dealt };
   const n = nextGiveChangeCustomer(s, NORMAL, seeded(5));
   assert.notEqual(n.dealt.map((c) => c.coinId).sort().join(","), first);
+});
+
+import { setCoinScale, pileHeightDefaultMm } from "../src/game.js";
+
+test("pileHeightMm follows the coin scale: the box stays the same size, the play height shrinks", () => {
+  setCoinScale(1.5);
+  try {
+    const margin = 1.5 * 14.2;
+    assert.equal(pileHeightMm(createState()), pileHeightDefaultMm());
+    assert.ok(pileHeightMm(createState()) < PILE_HEIGHT_MM);
+    near(pileHeightMm({ ...createState(), mode: "give-change" }, "pile"), 45 - 2 * margin);
+    near(pileHeightMm({ ...createState(), mode: "give-change" }, "change"), 45 - 2 * margin);
+  } finally {
+    setCoinScale(1);
+  }
 });

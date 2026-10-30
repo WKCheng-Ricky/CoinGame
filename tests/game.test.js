@@ -752,3 +752,93 @@ test("unitUids and stackCounts measure the link distance in the given height", (
   assert.equal(stackCounts(pile, PILE_HEIGHT_MM).size, 0);
   assert.deepEqual([...stackCounts(pile, h)], [[2, 2]]);
 });
+
+import {
+  setCoinScale, getCoinScale, diameterOf, pileMarginMm, pileWidthMm, pileHeightDefaultMm,
+} from "../src/game.js";
+
+function atScale(k, fn) {
+  setCoinScale(k);
+  try { fn(); } finally { setCoinScale(1); }
+}
+
+test("at scale 1 the scaled geometry equals the base constants", () => {
+  assert.equal(getCoinScale(), 1);
+  assert.equal(pileMarginMm(), PILE_MARGIN_MM);
+  assert.equal(pileWidthMm(), PILE_WIDTH_MM);
+  assert.equal(pileHeightDefaultMm(), PILE_HEIGHT_MM);
+  for (const c of COINS) assert.equal(diameterOf(c), c.diameter);
+});
+
+test("at scale 1.5 coins and the margin grow but the width and the Give Change customer box keep their size", () => {
+  atScale(1.5, () => {
+    assert.equal(getCoinScale(), 1.5);
+    for (const c of COINS) approx(diameterOf(c), 1.5 * c.diameter);
+    approx(pileMarginMm(), 1.5 * PILE_MARGIN_MM);
+    approx(pileWidthMm() + 2 * pileMarginMm(), PILE_WIDTH_MM + 2 * PILE_MARGIN_MM);
+    approx(heightForBox(CUSTOMER_BOX_MM) + 2 * pileMarginMm(), CUSTOMER_BOX_MM);
+  });
+});
+
+test("placeCoin at scale 1.5 keeps 30 coins inside the play area", () => {
+  atScale(1.5, () => {
+    const rng = seeded(11);
+    const pile = [];
+    for (let i = 0; i < 30; i++) {
+      const coin = COINS[i % COINS.length];
+      const { x, y, rot } = placeCoin(pile, coin, rng, pileHeightDefaultMm());
+      assert.ok(Math.abs(x) <= 0.5 && Math.abs(y) <= 0.5);
+      pile.push({ uid: i, coinId: coin.id, x, y, rot });
+    }
+  });
+});
+
+test("placeCoin at scale 1.5 rejects a spot only the scaled radius rules out", () => {
+  atScale(1.5, () => {
+    const h = pileHeightDefaultMm();
+    const coin = coinById("2p");
+    const first = { uid: 1, coinId: "2p", x: 0, y: 0, rot: 0 };
+    // first try: x = 0.17 of the play width (about 16 mm), between 1 and 1.5 radii of the coin at the centre
+    const near = 0.17 * pileWidthMm();
+    assert.ok(near > coin.diameter / 2 && near < diameterOf(coin) / 2);
+    const spot = placeCoin([first], coin, seq([(0.17 / 0.35 + 1) / 2, 0.5, 0.99, 0.5, 0.5]), h);
+    assert.ok(spot.x > 0.3, `placed at ${spot.x}`);
+  });
+});
+
+import { CHANGE_BOX_COMPACT_MM } from "../src/game.js";
+import { LARGE_COIN_SCALE } from "../src/config.js";
+
+test("heightForBox stays positive for every Give Change box at the Large Coins scale", () => {
+  atScale(LARGE_COIN_SCALE, () => {
+    for (const box of [CUSTOMER_BOX_MM, CHANGE_BOX_MM, CUSTOMER_BOX_COMPACT_MM, CHANGE_BOX_COMPACT_MM]) {
+      assert.ok(heightForBox(box) > 0, `${box} mm box gives ${heightForBox(box)}`);
+    }
+  });
+});
+
+test("heightForBox is unchanged at scale 1 (the floor does not apply)", () => {
+  approx(heightForBox(CUSTOMER_BOX_COMPACT_MM), CUSTOMER_BOX_COMPACT_MM - 2 * PILE_MARGIN_MM);
+});
+
+import { LARGE_BOX_CELLS, changeBoxMm, customerBoxMm, pileBoxMm } from "../src/game.js";
+
+test("at scale 1 the pile boxes are the base sizes", () => {
+  approx(pileBoxMm(), PILE_HEIGHT_MM + 2 * PILE_MARGIN_MM);
+  assert.equal(changeBoxMm(), CHANGE_BOX_MM);
+  assert.equal(customerBoxMm(), CUSTOMER_BOX_MM);
+});
+
+test("at scale 1.5 the default pile box is 7 grid cells high and the change and customer boxes 3 (a cell is 10 mm of coin)", () => {
+  atScale(1.5, () => {
+    approx(pileBoxMm() / (10 * 1.5), 7);
+    approx(changeBoxMm() / (10 * 1.5), 3);
+    approx(customerBoxMm() / (10 * 1.5), 3);
+    assert.deepEqual(LARGE_BOX_CELLS, { pile: 7, change: 3, customer: 3 });
+    approx(pileHeightDefaultMm() + 2 * pileMarginMm(), pileBoxMm());
+  });
+});
+
+test("the Large Coins change and customer boxes still leave a positive play height", () => {
+  atScale(1.5, () => assert.ok(heightForBox(changeBoxMm()) > 0 && heightForBox(customerBoxMm()) > 0));
+});

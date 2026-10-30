@@ -117,3 +117,36 @@ test("toPileFraction and pixelsToFraction honour a custom height", () => {
   approx(p.y, 0);
   approx(pixelsToFraction(0, rect.height, rect, h).y, (h + 2 * PILE_MARGIN_MM) / h);
 });
+
+import { setCoinScale } from "../src/game.js";
+
+function atScale(k, fn) {
+  setCoinScale(k);
+  try { fn(); } finally { setCoinScale(1); }
+}
+
+test("coinSizePx at scale 1.5 is 1.5 times the scale-1 size", () => {
+  const rect = { width: 300 };
+  for (const c of COINS) {
+    const base = coinSizePx(c, rect);
+    atScale(1.5, () => approx(coinSizePx(c, rect), 1.5 * base));
+  }
+});
+
+test("toPileFraction and pixelsToFraction invert pileBox at scale 1 and 1.5", () => {
+  for (const k of [1, 1.5]) {
+    atScale(k, () => {
+      const rect = { left: 10, top: 20, width: 300, height: 200 };
+      const h = 40;
+      const { left, top } = pileBox({ x: 0.2, y: -0.3 }, h);
+      const back = toPileFraction({ x: rect.left + (left / 100) * rect.width, y: rect.top + (top / 100) * rect.height }, rect, h);
+      approx(back.x, 0.2);
+      approx(back.y, -0.3);
+      const d = pixelsToFraction(30, 20, rect, h);
+      const a = pileBox({ x: 0, y: 0 }, h);
+      const b = pileBox({ x: d.x, y: d.y }, h);
+      approx(((b.left - a.left) / 100) * rect.width, 30);
+      approx(((b.top - a.top) / 100) * rect.height, 20);
+    });
+  }
+});
