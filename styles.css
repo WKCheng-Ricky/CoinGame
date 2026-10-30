@@ -125,6 +125,8 @@ input { width: 100%; padding: 0.5rem 0.75rem; border: 2px solid var(--control-bo
 label { display: block; margin: 0.5rem 0 0.25rem; }
 
 .choice { width: 100%; max-width: 18.5rem; margin: 0.75rem auto; padding: 0.5rem 0.75rem; border: 2px solid var(--line); border-radius: 0.8rem; background: var(--panel); }
+/* the Options screen is a page of its own: the list sits on it, not in the narrow card used on the home screen */
+#screen-options .choice { max-width: none; margin: 0.5rem 0; padding: 0; border: 0; background: none; }
 .choice-note { min-height: 1.4em; margin: -0.25rem 0 0.5rem; color: var(--muted); font-size: 0.85rem; }
 
 .coin-edge { stroke: var(--coin-edge); }
@@ -280,23 +282,25 @@ label { display: block; margin: 0.5rem 0 0.25rem; }
 .mode input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; pointer-events: none; }
 .mode b { display: block; }
 .mode small { display: block; color: var(--muted); font-size: 0.85rem; }
-.options label { display: flex; align-items: center; gap: 0.6rem; min-height: 44px; margin: 0; padding-inline: 0.4rem; text-align: left; }
+.options label { display: flex; flex-wrap: nowrap; align-items: center; gap: 0.6rem; min-height: 44px; margin: 0; padding-inline: 0.4rem; text-align: left; }
 .options input { width: 1.2rem; height: 1.2rem; flex: none; }
-.options label { flex-wrap: wrap; }
-.opt-text { flex: 1 1 auto; min-width: 0; }
+.options .opt-text { display: inline-flex; align-items: center; gap: 0.4rem; flex: 1 1 0; min-width: 0; line-height: 1.2; }
+.options .badge { flex: none; }
+.options .radios { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; padding-inline: 0.4rem; }
+.options .radios label { min-width: 0; padding-inline: 0; gap: 0.3rem; }
+.ico { width: 1.15rem; height: 1.15rem; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ico-fill { width: 14px; height: 14px; stroke: none; }
 .badge { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0 0.45rem; border: 1.5px solid currentColor; border-radius: 1rem; font-size: 0.8rem; line-height: 1.4; }
 .badge-easier { color: var(--good); }
 .badge-harder { color: var(--bad); }
 .badge-neutral { color: var(--muted); }
-.opt-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; min-height: 44px; padding-inline: 0.4rem; text-align: left; }
-.radios { display: flex; flex-wrap: wrap; gap: 0.2rem 0.4rem; padding-inline: 0.4rem; }
-.radios label { padding-inline: 0.2rem; min-width: 4.5rem; }
+.opt-head { display: flex; flex-wrap: nowrap; align-items: center; gap: 0.6rem; min-height: 44px; padding-inline: 0.4rem; text-align: left; }
 .why { display: block; margin: -0.3rem 0 0.3rem 2.2rem; color: var(--muted); font-size: 0.85rem; text-align: left; }
 h2.sec { width: 100%; max-width: 18.5rem; margin: 0.9rem auto 0.3rem; text-align: left; }
 .play { width: 100%; max-width: 18.5rem; margin: 0.5rem auto 1rem; }
 
-#screen-home, #screen-custom { flex: 1; min-height: 0; overflow-y: auto; }
-#screen-home { position: relative; display: grid; align-content: safe center; justify-items: center; text-align: center; }
+#screen-home, #screen-custom, #screen-options { flex: 1; min-height: 0; overflow-y: auto; }
+#screen-home { padding-top: 2.75rem; position: relative; display: grid; align-content: safe center; justify-items: center; text-align: center; }
 
 .pile:empty::before { content: "Tap a coin to add it"; color: var(--muted); position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
 #screen-play.locked .coin, #screen-play.locked .pile-coin { opacity: 0.5; }
@@ -310,6 +314,24 @@ h2.sec { width: 100%; max-width: 18.5rem; margin: 0.9rem auto 0.3rem; text-align
 .tray-ghost svg { display: block; width: 100%; height: 100%; }
 .pile.over-pile { outline: 3px solid var(--accent); outline-offset: -3px; }
 #screen-play.locked .coin { cursor: default; }
+
+/* Home quick settings: the Difficulty segments, the Larger coins button and the chips of the options that are on. */
+.seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.25rem; width: 100%; max-width: 18.5rem; margin: 0 auto 0.5rem; }
+.seg label { position: relative; display: grid; place-items: center; min-height: 44px; margin: 0; padding: 0 0.1rem; border: 2px solid var(--line); border-radius: 0.6rem; background: var(--panel); font-size: 0.82rem; font-weight: 600; text-align: center; cursor: pointer; }
+.seg label:has(input:checked) { border-color: var(--accent); background: var(--accent-tint); }
+.seg label:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 2px; }
+.seg input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; pointer-events: none; }
+.preset-note { width: 100%; max-width: 18.5rem; min-height: 1.2em; margin: -0.2rem auto 0.4rem; color: var(--muted); font-size: 0.85rem; text-align: left; }
+.big-toggle { display: flex; align-items: center; gap: 0.5rem; width: 100%; max-width: 18.5rem; min-height: 44px; margin: 0 auto; padding: 0 0.8rem; border: 2px solid var(--line); border-radius: 0.7rem; background: var(--panel); text-align: left; }
+.big-toggle[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-tint); }
+.big-toggle .state { margin-left: auto; color: var(--muted); font-size: 0.85rem; }
+.chips { display: flex; flex-wrap: wrap; gap: 0.35rem; width: 100%; max-width: 18.5rem; margin: 0.6rem auto 0; padding: 0; list-style: none; }
+.chips li { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.15rem 0.55rem; border: 1.5px solid var(--line); border-radius: 1rem; background: var(--panel); font-size: 0.82rem; }
+.chips li.none { border: 0; background: none; color: var(--muted); }
+.chips .ico { width: 1rem; height: 1rem; }
+.sub { margin: 0 0 0.4rem; color: var(--muted); font-size: 0.85rem; }
+#options-back { justify-self: start; }
+.options-btn { position: absolute; top: 0; left: 0; display: inline-flex; align-items: center; gap: 0.35rem; min-height: 44px; padding: 0 0.7rem; border-radius: 0.7rem; color: var(--ink); }
 
 .theme-toggle { position: absolute; top: 0; right: 0; min-width: 44px; min-height: 44px; padding: 0; border-radius: 50%; display: grid; place-items: center; color: var(--ink); }
 .theme-toggle svg { display: none; }

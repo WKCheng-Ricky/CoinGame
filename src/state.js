@@ -1,5 +1,5 @@
 import { COINS } from "./coins.js";
-import { MODE_IDS, defaultOptions, isValidValue, timerOn } from "./options.js";
+import { MODE_IDS, PRESETS, defaultOptions, isValidValue, timerOn } from "./options.js";
 import { isExpired, parFor, scoreFor } from "./timer.js";
 import {
   CHANGE_BOX_COMPACT_MM, CUSTOMER_BOX_COMPACT_MM, changeDue, check, checkAnswer, clampPosition, formatPence,
@@ -23,6 +23,13 @@ export function createState() {
 export function setOption(state, id, value) {
   if (!isValidValue(id, value)) return state;
   return { ...state, options: { ...state.options, [id]: value } };
+}
+
+// Sets the five options of a difficulty preset; Large Coins is not one of them.
+export function applyPreset(state, id) {
+  const preset = PRESETS.find((p) => p.id === id);
+  if (!preset) return state;
+  return Object.entries(preset.values).reduce((s, [key, value]) => setOption(s, key, value), state);
 }
 
 // The home screen's selected mode; a game start sets it again.

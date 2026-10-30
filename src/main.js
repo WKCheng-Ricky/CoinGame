@@ -4,6 +4,7 @@ import { coinScaleFor, giveChangeOdds, timingFromSearch } from "./config.js";
 import { mountHome } from "./home.js";
 import { createDrag, createTrayDrag } from "./drag.js";
 import { isCheckShortcut } from "./keys.js";
+import { icon } from "./icons.js";
 import { timerOn } from "./options.js";
 import { clockText, formatClock, isExpired, timeLeftMs } from "./timer.js";
 import { applyTheme, getStorage, nextTheme, readTheme, saveTheme, themeLabel } from "./theme.js";
@@ -11,11 +12,11 @@ import { announce, renderPile, renderTray, setText, showStackBadges } from "./re
 import {
   addToPile, canAdvance, clearPile, createState, isContinuous, nextGiveChangeCustomer, nextCustomer, nextRound, startCashier, startGiveChange, submitAnswer,
   addToPileAt, moveCoin, moveGroup, removeFromPile, settleCoin, settleGroupCoins, setOption, selectMode,
-  pileHeightMm, startGame, submitCheck, submitGiveChangeAnswer, transferCoins, sendCoin, expireRound,
+  applyPreset, pileHeightMm, startGame, submitCheck, submitGiveChangeAnswer, transferCoins, sendCoin, expireRound,
 } from "./state.js";
 
 const $ = (id) => document.getElementById(id);
-const SCREENS = ["home", "custom", "play"];
+const SCREENS = ["home", "custom", "options", "play"];
 
 let state = createState();
 let shownMessage = state.message;
@@ -600,11 +601,23 @@ $("custom-form").addEventListener("submit", (e) => {
 $("custom-back").addEventListener("click", () => showScreen("home"));
 $("btn-back").addEventListener("click", () => showScreen("home"));
 
+$("btn-options").prepend(icon("gear", 18));
+$("btn-options").addEventListener("click", () => showScreen("options"));
+$("options-back").addEventListener("click", () => {
+  optionNotes.cancelAll();
+  showScreen("home");
+  $("btn-options").focus();
+});
+
 const home = mountHome(
-  { modes: $("modes"), options: $("options"), play: $("btn-play") },
+  {
+    modes: $("modes"), presets: $("presets"), large: $("btn-large"), chips: $("chips"),
+    options: $("options"), optionsFor: $("options-for"), play: $("btn-play"),
+  },
   {
     onMode: (mode) => { optionNotes.cancelAll(); update(selectMode(state, mode)); },
     onOption: (id, value) => update(setOption(state, id, value)),
+    onPreset: (id) => update(applyPreset(state, id)),
     onPlay: startSelected,
   },
 );

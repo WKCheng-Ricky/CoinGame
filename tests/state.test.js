@@ -6,11 +6,14 @@ import {
   addToPile, removeFromPile, clearPile, submitCheck, canAdvance,
   setOption, selectMode, moveCoin, settleCoin, addToPileAt, moveGroup, settleGroupCoins,
   startCashier, nextCustomer, submitAnswer, isContinuous,
-  startGiveChange, nextGiveChangeCustomer, submitGiveChangeAnswer, transferCoins, sendCoin, expireRound,
+  startGiveChange, nextGiveChangeCustomer, submitGiveChangeAnswer, transferCoins, sendCoin, expireRound, applyPreset,
 } from "../src/state.js";
 import { formatPence, layoutStacks, randomHandful, stackCounts, total, PUSH_FACTOR, PILE_WIDTH_MM, PILE_HEIGHT_MM, STACK_STEP_MM, detachNudge } from "../src/game.js";
 import { coinById } from "../src/coins.js";
+import { presetOf } from "../src/options.js";
 
+// the default is Normal, which times and scores; tests of the plain messages use this
+const UNTIMED = (s = createState()) => setOption(s, "timerScore", false);
 const EXACT_395 = pileOf("£2", "£1", "50p", "20p", "20p", "5p");
 const withPile = (s, pile) => ({ ...s, pile });
 
@@ -25,7 +28,7 @@ test("createState has the expected shape", () => {
     mode: "endless", target: 0, pile: [], nextUid: 1, rounds: 0, solved: false, solvedAt: 0, unserved: false,
     roundStartedAt: 0, score: 0, lastPoints: 0,
     message: { text: "", kind: "" },
-    options: { showCoins: false, largeCoins: false, autoStack: true, shortPay: true, timerScore: false, timeLimit: 0 },
+    options: { showCoins: false, largeCoins: false, autoStack: true, shortPay: true, timerScore: true, timeLimit: 0 },
     change: [], price: 0, scenario: "", paid: 0, dealt: [],
   });
   assert.equal(ADVANCE_DELAY_MS, 400);
@@ -496,7 +499,7 @@ test("nextCustomer keeps rounds and mode, resets solved and message, and changes
 });
 
 test("submitAnswer with the exact total solves once", () => {
-  const s = startCashier(createState(), seeded(5));
+  const s = startCashier(UNTIMED(), seeded(5));
   const solved = submitAnswer(s, total(s.pile), 1000);
   assert.equal(solved.solved, true);
   assert.equal(solved.solvedAt, 1000);
@@ -654,7 +657,7 @@ test("submitGiveChangeAnswer accepts none and short on matching scenarios", () =
 });
 
 test("submitGiveChangeAnswer success messages are plain", () => {
-  const base = startGiveChange(createState(), NORMAL, seeded(1));
+  const base = startGiveChange(UNTIMED(), NORMAL, seeded(1));
   const check = submitGiveChangeAnswer(
     { ...base, pile: pileOf("£2", "£2", "£1"), paid: 500, scenario: "over", price: 235, change: pileOf("£2", "50p", "10p", "5p") }, "check", 1);
   assert.equal(check.message.text, "Correct! Change: £2.65.");
@@ -809,7 +812,7 @@ const REFUSED = { text: "That is more than they paid. Press Clear to start again
 
 // A Give Change round with fixed amounts: the customer pile is also the dealt pile.
 function round(pile, { paid = total(pile), price = paid - 50, scenario = "over", change = [] } = {}) {
-  return { ...startGiveChange(createState(), NORMAL, seeded(1)), pile, dealt: pile, paid, price, scenario, change, nextUid: 50 };
+  return { ...startGiveChange(UNTIMED(), NORMAL, seeded(1)), pile, dealt: pile, paid, price, scenario, change, nextUid: 50 };
 }
 
 test("createState has no paid amount and no dealt pile", () => {
@@ -1051,10 +1054,11 @@ test("pileHeightMm follows the coin scale: the box stays the same size, the play
 
 const ODDS = { underpaid: 0.25, exactShare: 1 / 3 };
 const OFF = (s) => setOption(s, "autoStack", false);
+const STACKED = (s = createState()) => setOption(s, "autoStack", true);
 
 test("startCashier with Auto-stack on deals one stack per denomination", () => {
   for (let seed = 1; seed <= 30; seed++) {
-    const s = startCashier(createState(), seeded(seed));
+    const s = startCashier(STACKED(), seeded(seed));
     const ids = new Set(s.pile.map((e) => e.coinId));
     const counts = stackCounts(s.pile);
     const repeated = [...ids].filter((id) => s.pile.filter((e) => e.coinId === id).length > 1);
@@ -1063,7 +1067,7 @@ test("startCashier with Auto-stack on deals one stack per denomination", () => {
 });
 
 test("startGiveChange with Auto-stack on stacks the dealt coins and keeps them as dealt", () => {
-  const s = startGiveChange(createState(), ODDS, seeded(7));
+  const s = startGiveChange(STACKED(), ODDS, seeded(7));
   assert.deepEqual(s.dealt, s.pile);
   assert.ok(s.pile.every((e) => e.customer));
   assert.equal(s.nextUid, s.pile.length + 1);
@@ -1134,7 +1138,7 @@ test("a par override changes the points", () => {
 });
 
 test("with the option off there are no points and the message is as before", () => {
-  const s = startCashier(createState(), seeded(1), 0);
+  const s = startCashier(UNTIMED(), seeded(1), 0);
   const solved = submitAnswer(s, total(s.pile), 5000);
   assert.equal(solved.score, 0);
   assert.equal(solved.message.text, `Correct! That is ${formatPence(total(s.pile))}.`);
@@ -1247,9 +1251,27 @@ test("Give Change deals the customer's stacks for the compact box when asked", (
     const rng = seeded(seed);
     const ids = randomHandful(rng);
     const expected = layoutStacks(ids, rng, heightForBox(CUSTOMER_BOX_COMPACT_MM));
-    const dealt = startGiveChange(createState(), ODDS, seeded(seed), 0, true).pile;
+    const dealt = startGiveChange(STACKED(), ODDS, seeded(seed), 0, true).pile;
     assert.deepEqual(dealt.map(({ coinId, x, y, rot }) => ({ coinId, x, y, rot })), expected, `seed ${seed}`);
   }
-  const next = nextGiveChangeCustomer(startGiveChange(createState(), ODDS, seeded(1)), ODDS, seeded(2), 0, true);
+  const next = nextGiveChangeCustomer(startGiveChange(STACKED(), ODDS, seeded(1)), ODDS, seeded(2), 0, true);
   assert.ok(next.pile.length > 0);
+});
+
+// --- Presets ---
+test("applyPreset sets the five values and leaves Large Coins alone", () => {
+  const big = setOption(createState(), "largeCoins", true);
+  for (const [id, hint] of [["easy", true], ["normal", false], ["hard", false], ["veryHard", false]]) {
+    const out = applyPreset(big, id);
+    assert.equal(out.options.showCoins, hint, id);
+    assert.equal(out.options.largeCoins, true, id);
+    assert.equal(presetOf(out.options), id);
+  }
+  assert.equal(applyPreset(createState(), "hard").options.timeLimit, 30);
+  assert.equal(applyPreset(createState(), "veryHard").options.timeLimit, 10);
+});
+
+test("applyPreset ignores an unknown id", () => {
+  const s = createState();
+  assert.equal(applyPreset(s, "nope"), s);
 });
