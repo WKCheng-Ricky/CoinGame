@@ -14,6 +14,7 @@
 <body>
   <main>
     <section id="screen-home">
+      <button id="btn-options" class="options-btn" type="button">Options</button>
       <button id="btn-theme" class="theme-toggle" type="button" data-state="auto" aria-label="Theme: Auto. Press to switch to Light" title="Theme: Auto. Press to switch to Light">
         <svg class="icon-auto" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg>
         <svg class="icon-light" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
@@ -23,10 +24,20 @@
       <p>Make the amount using UK coins.</p>
       <h2 id="modes-heading" class="sec">Game</h2>
       <div id="modes" class="modes" role="radiogroup" aria-labelledby="modes-heading"></div>
-      <h2 class="sec">Options</h2>
+      <h2 class="sec">Quick settings</h2>
+      <div id="presets" class="seg"></div>
+      <p id="preset-note" class="preset-note"></p>
+      <button id="btn-large" class="big-toggle" type="button"></button>
+      <ul id="chips" class="chips"></ul>
+      <button id="btn-play" class="primary play" type="button">Play</button>
+    </section>
+
+    <section id="screen-options" hidden>
+      <button id="options-back" type="button">&lsaquo; Back</button>
+      <h1 tabindex="-1">Options</h1>
+      <p id="options-for" class="sub"></p>
       <div id="options" class="choice options"></div>
       <p id="option-note" class="choice-note" aria-live="polite"></p>
-      <button id="btn-play" class="primary play" type="button">Play</button>
     </section>
 
     <section id="screen-custom" hidden>
@@ -48,6 +59,8 @@
         <div class="topbar-info">
           <h1 id="play-heading" class="target" tabindex="-1"><span id="play-heading-label" class="label">Make</span> <span id="play-target"></span></h1>
           <p id="play-rounds" class="rounds" hidden></p>
+          <p id="play-clock" class="rounds" hidden></p>
+          <div id="play-countdown" class="countdown" aria-hidden="true" hidden><div id="play-countdown-bar" class="countdown-bar"></div></div>
         </div>
         <div id="topbar-customer" role="group" aria-labelledby="customer-coins-label" hidden>
           <p id="customer-coins-label" class="pile-label">Customer Coins:</p>

@@ -360,3 +360,113 @@ export function stackCounts(pile, heightMm = pileHeightDefaultMm()) {
   }
   return counts;
 }
+
+// Auto-stack: the dealt handful as one stack per denomination, spread so the stacks do not cover each other.
+export const LAYOUT_ATTEMPTS = 20;
+const STACK_STEP_LEN_MM = Math.hypot(STACK_STEP_MM.x, STACK_STEP_MM.y);
+
+function stacksOf(coinIds) {
+  const counts = new Map();
+  for (const id of coinIds) counts.set(id, (counts.get(id) ?? 0) + 1);
+  // a stack is drawn as a disc: the bottom coin's radius plus the offset of the top coin
+  return [...counts].map(([id, n]) => ({ id, n, radius: diameterOf(coinById(id)) / 2 + (n - 1) * STACK_STEP_LEN_MM }));
+}
+
+function discOverlap(a, b, heightMm) {
+  const d = Math.hypot((a.x - b.x) * pileWidthMm(), (a.y - b.y) * heightMm);
+  return Math.max(0, a.radius + b.radius - d);
+}
+
+function totalOverlap(discs, heightMm) {
+  let sum = 0;
+  for (let i = 0; i < discs.length; i++) {
+    for (let j = i + 1; j < discs.length; j++) sum += discOverlap(discs[i], discs[j], heightMm);
+  }
+  return sum;
+}
+
+// Total overlap depth (mm) between the stacks of an auto-stacked pile (one stack per denomination, bottom first).
+export function stackOverlapMm(entries, heightMm = pileHeightDefaultMm()) {
+  const discs = stacksOf(entries.map((e) => e.coinId)).map((s) => {
+    const bottom = entries.find((e) => e.coinId === s.id);
+    return { x: bottom.x, y: bottom.y, radius: s.radius };
+  });
+  return totalOverlap(discs, heightMm);
+}
+
+function shuffle(list, rng) {
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+// Where a stack's bottom coin may sit so the rest of the stack stays inside the pile.
+function bottomRange(stack, heightMm) {
+  const reach = stack.n - 1;
+  return {
+    xHi: Math.max(-0.5, 0.5 - (reach * STACK_STEP_MM.x) / pileWidthMm()),
+    yLo: Math.min(0.5, -0.5 + (reach * -STACK_STEP_MM.y) / heightMm),
+  };
+}
+
+function sampleLayout(stacks, rng, heightMm) {
+  const placed = [];
+  for (const s of shuffle(stacks, rng)) {
+    const { xHi, yLo } = bottomRange(s, heightMm);
+    let best = null;
+    for (let i = 0; i < MAX_PLACEMENT_TRIES; i++) {
+      const disc = { ...s, x: -0.5 + rng() * (xHi + 0.5), y: yLo + rng() * (0.5 - yLo) };
+      const cost = placed.reduce((sum, p) => sum + discOverlap(disc, p, heightMm), 0);
+      if (best === null || cost < best.cost) best = { disc, cost };
+      if (cost === 0) break;
+    }
+    placed.push(best.disc);
+  }
+  return placed;
+}
+
+// One jittered grid per column count; the stacks fill its cells in random order.
+function gridLayouts(stacks, rng, heightMm) {
+  const k = stacks.length;
+  const widest = Math.max(...stacks.map((s) => s.radius)) * 2;
+  const layouts = [];
+  for (let cols = 1; cols <= k; cols++) {
+    const rows = Math.ceil(k / cols);
+    const stepX = (1 / cols) * pileWidthMm();
+    const stepY = (1 / rows) * heightMm;
+    const jitterX = Math.max(0, stepX - widest) / 2 / pileWidthMm();
+    const jitterY = Math.max(0, stepY - widest) / 2 / heightMm;
+    layouts.push(shuffle(stacks, rng).map((s, i) => ({
+      ...s,
+      x: ((i % cols) + 0.5) / cols - 0.5 + (rng() - 0.5) * jitterX,
+      y: (Math.floor(i / cols) + 0.5) / rows - 0.5 + (rng() - 0.5) * jitterY,
+    })));
+  }
+  return layouts;
+}
+
+// One entry per coin id: each denomination is a stack (bottom first, stepped by STACK_STEP_MM, one rotation),
+// the stacks at random spots that do not overlap. When the box is too small for that, the least-overlapping layout wins.
+export function layoutStacks(coinIds, rng = Math.random, heightMm = pileHeightDefaultMm()) {
+  const stacks = stacksOf(coinIds);
+  let best = null;
+  const consider = (discs) => {
+    const cost = totalOverlap(discs, heightMm);
+    if (best === null || cost < best.cost) best = { discs, cost };
+  };
+  for (let attempt = 0; attempt < LAYOUT_ATTEMPTS && best?.cost !== 0; attempt++) {
+    consider(sampleLayout(stacks, rng, heightMm));
+  }
+  if (best.cost > 0) gridLayouts(stacks, rng, heightMm).forEach(consider);
+  return best.discs.flatMap((disc) => {
+    const rot = Math.floor(rng() * 360);
+    return Array.from({ length: disc.n }, (_, i) => ({
+      coinId: disc.id,
+      ...clampPosition(disc.x + (i * STACK_STEP_MM.x) / pileWidthMm(), disc.y + (i * STACK_STEP_MM.y) / heightMm),
+      rot,
+    }));
+  });
+}

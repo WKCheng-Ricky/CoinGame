@@ -1,8 +1,9 @@
 import { COINS } from "./coins.js";
-import { MODE_IDS, defaultOptions, isOptionId } from "./options.js";
+import { MODE_IDS, PRESETS, defaultOptions, isValidValue, timerOn } from "./options.js";
+import { isExpired, parFor, scoreFor } from "./timer.js";
 import {
   CHANGE_BOX_COMPACT_MM, CUSTOMER_BOX_COMPACT_MM, changeDue, check, checkAnswer, clampPosition, formatPence,
-  changeBoxMm, customerBoxMm, heightForBox, judgeAnswer, pileHeightDefaultMm, placeCoin, placeHandfulCoin, priceFor, randomHandful, rollScenario, settlePile,
+  changeBoxMm, customerBoxMm, heightForBox, judgeAnswer, layoutStacks, pileHeightDefaultMm, placeCoin, placeHandfulCoin, priceFor, randomHandful, rollScenario, settlePile,
   settleGroup, total,
 } from "./game.js";
 
@@ -12,15 +13,23 @@ const NO_MESSAGE = { text: "", kind: "" };
 
 export function createState() {
   return {
-    mode: "endless", target: 0, pile: [], nextUid: 1, rounds: 0, solved: false, solvedAt: 0,
+    mode: "endless", target: 0, pile: [], nextUid: 1, rounds: 0, solved: false, solvedAt: 0, unserved: false,
+    roundStartedAt: 0, score: 0, lastPoints: 0,
     message: NO_MESSAGE, options: defaultOptions(),
     change: [], price: 0, scenario: "", paid: 0, dealt: [],
   };
 }
 
 export function setOption(state, id, value) {
-  if (!isOptionId(id) || typeof value !== "boolean") return state;
+  if (!isValidValue(id, value)) return state;
   return { ...state, options: { ...state.options, [id]: value } };
+}
+
+// Sets the five options of a difficulty preset; Large Coins is not one of them.
+export function applyPreset(state, id) {
+  const preset = PRESETS.find((p) => p.id === id);
+  if (!preset) return state;
+  return Object.entries(preset.values).reduce((s, [key, value]) => setOption(s, key, value), state);
 }
 
 // The home screen's selected mode; a game start sets it again.
@@ -29,12 +38,28 @@ export function selectMode(state, mode) {
   return { ...state, mode };
 }
 
-export function startGame(state, mode, target) {
-  return { ...createState(), mode, target, options: state.options };
+// `now` (ms) is when the round is dealt; the speed score is measured from it.
+export function startGame(state, mode, target, now = 0) {
+  return { ...createState(), mode, target, options: state.options, roundStartedAt: now };
 }
 
-export function nextRound(state, target) {
-  return { ...createState(), mode: state.mode, rounds: state.rounds, target, options: state.options };
+export function nextRound(state, target, now = 0) {
+  return {
+    ...createState(), mode: state.mode, rounds: state.rounds, score: state.score, target, options: state.options,
+    roundStartedAt: now,
+  };
+}
+
+// An answer after the limit does not count: the customer has already left (the clock tick may not have run yet).
+const late = (state, now) => state.mode !== "custom" && isExpired(state.roundStartedAt, now, state.options.timeLimit);
+
+// The fields a correct answer changes: the success message, and the speed points when rounds are timed.
+// Custom has no par, so it is never scored.
+function solvedFields(state, now, parMs, text) {
+  const par = parFor(state.mode, parMs);
+  if (!timerOn(state.options) || par === null) return { message: { text, kind: "success" } };
+  const points = scoreFor(now - state.roundStartedAt, par);
+  return { score: state.score + points, lastPoints: points, message: { text: `${text} +${points} points`, kind: "success" } };
 }
 
 // Play-area height of a pile: Give Change mode gives the customer's and the player's piles short boxes.
@@ -57,13 +82,17 @@ function locked(state, key) {
   return state.solved || state.mode === "cashier" || (state.mode === "give-change" && key === "pile");
 }
 
-function dealHandful(state, ids, rng) {
+function dealHandful(state, ids, rng, compact = false) {
   const empty = { ...state, pile: [], nextUid: 1, solved: false, solvedAt: 0, message: NO_MESSAGE };
-  return ids.reduce((s, id) => placeAndSettle(s, COINS.find((c) => c.id === id), placeHandfulCoin, rng), empty);
+  if (state.options.autoStack) {
+    const pile = layoutStacks(ids, rng, pileHeightMm(state, "pile", compact)).map((e, i) => ({ uid: i + 1, ...e }));
+    return { ...empty, pile, nextUid: pile.length + 1 };
+  }
+  return ids.reduce((s, id) => placeAndSettle(s, COINS.find((c) => c.id === id), placeHandfulCoin, rng, "pile", compact), empty);
 }
 
-export function startCashier(state, rng = Math.random) {
-  const fresh = { ...createState(), mode: "cashier", options: state.options };
+export function startCashier(state, rng = Math.random, now = 0) {
+  const fresh = { ...createState(), mode: "cashier", options: state.options, roundStartedAt: now };
   return dealHandful(fresh, randomHandful(rng), rng);
 }
 
@@ -75,27 +104,33 @@ function setScenario(state, odds, rng) {
   return { ...state, pile, scenario, price: priceFor(paid, scenario, rng), paid, dealt: pile };
 }
 
-export function startGiveChange(state, odds, rng = Math.random) {
-  const fresh = { ...createState(), mode: "give-change", options: state.options };
-  return setScenario(dealHandful(fresh, randomHandful(rng), rng), odds, rng);
+// `compact` (a short screen) deals the customer's coins for the smaller pile box.
+export function startGiveChange(state, odds, rng = Math.random, now = 0, compact = false) {
+  const fresh = { ...createState(), mode: "give-change", options: state.options, roundStartedAt: now };
+  return setScenario(dealHandful(fresh, randomHandful(rng), rng, compact), odds, rng);
 }
 
-export function nextGiveChangeCustomer(state, odds, rng = Math.random) {
+export function nextGiveChangeCustomer(state, odds, rng = Math.random, now = 0, compact = false) {
   const previous = state.dealt.map((e) => e.coinId);
-  const fresh = { ...createState(), mode: "give-change", rounds: state.rounds, options: state.options };
-  return setScenario(dealHandful(fresh, randomHandful(rng, previous), rng), odds, rng);
+  const fresh = {
+    ...createState(), mode: "give-change", rounds: state.rounds, score: state.score, options: state.options, roundStartedAt: now,
+  };
+  return setScenario(dealHandful(fresh, randomHandful(rng, previous), rng, compact), odds, rng);
 }
 
-function successText(scenario, due, shortBy) {
-  if (scenario === "over") return `Correct! Change: ${formatPence(due)}.`;
-  if (scenario === "exact") return "Correct! No change due.";
-  return `Correct! They are ${formatPence(shortBy)} short.`;
+function answerText(scenario, due, shortBy) {
+  if (scenario === "over") return `Change: ${formatPence(due)}.`;
+  if (scenario === "exact") return "No change due.";
+  return `They are ${formatPence(shortBy)} short.`;
 }
+
+const successText = (scenario, due, shortBy) => `Correct! ${answerText(scenario, due, shortBy)}`;
 
 // Judging uses the amount paid when the round was dealt, not the customer pile as shown:
 // coins moved between the piles never change the scenario or the change due.
-export function submitGiveChangeAnswer(state, action, now) {
+export function submitGiveChangeAnswer(state, action, now, parMs = null) {
   if (state.solved) return state;
+  if (late(state, now)) return expireRound(state, now);
   const due = changeDue(state.paid, state.price);
   const result = judgeAnswer(state.scenario, action, total(state.change), due);
   if (result.correct) {
@@ -104,23 +139,24 @@ export function submitGiveChangeAnswer(state, action, now) {
       solved: true,
       solvedAt: now,
       rounds: state.rounds + 1,
-      message: { text: successText(state.scenario, due, state.price - state.paid), kind: "success" },
+      ...solvedFields(state, now, parMs, successText(state.scenario, due, state.price - state.paid)),
     };
   }
   return { ...state, message: { text: result.hint, kind: "hint" } };
 }
 
-export function nextCustomer(state, rng = Math.random) {
+export function nextCustomer(state, rng = Math.random, now = 0) {
   const previous = state.pile.map((e) => e.coinId); // Cashier's pile is read-only, and `dealt` is only set in Give Change
   return dealHandful(
-    { ...createState(), mode: state.mode, rounds: state.rounds, options: state.options },
+    { ...createState(), mode: state.mode, rounds: state.rounds, score: state.score, options: state.options, roundStartedAt: now },
     randomHandful(rng, previous),
     rng,
   );
 }
 
-export function submitAnswer(state, pence, now) {
+export function submitAnswer(state, pence, now, parMs = null) {
   if (state.solved) return state;
+  if (late(state, now)) return expireRound(state, now);
   const result = checkAnswer(state.pile, pence);
   if (result === "exact") {
     return {
@@ -128,7 +164,7 @@ export function submitAnswer(state, pence, now) {
       solved: true,
       solvedAt: now,
       rounds: state.rounds + 1,
-      message: { text: `Correct! That is ${formatPence(pence)}.`, kind: "success" },
+      ...solvedFields(state, now, parMs, `Correct! That is ${formatPence(pence)}.`),
     };
   }
   return { ...state, message: { text: result === "over" ? "Too high" : "Too low", kind: "hint" } };
@@ -247,8 +283,9 @@ export function sendCoin(state, uid, from, rng = Math.random, compact = false) {
   return transferCoins(state, [uid], uid, from, to, x, y, compact);
 }
 
-export function submitCheck(state, now) {
+export function submitCheck(state, now, parMs = null) {
   if (state.solved) return state;
+  if (late(state, now)) return expireRound(state, now);
   const result = check(state.pile, state.target);
   if (result === "exact") {
     return {
@@ -256,7 +293,7 @@ export function submitCheck(state, now) {
       solved: true,
       solvedAt: now,
       rounds: state.mode === "endless" ? state.rounds + 1 : state.rounds,
-      message: { text: `Correct! You made exactly ${formatPence(state.target)}.`, kind: "success" },
+      ...solvedFields(state, now, parMs, `Correct! You made exactly ${formatPence(state.target)}.`),
     };
   }
   const text = result === "over" ? "A bit too much" : "Not enough yet";
@@ -265,4 +302,24 @@ export function submitCheck(state, now) {
 
 export function canAdvance(state, now, delayMs = ADVANCE_DELAY_MS) {
   return state.solved && now - state.solvedAt >= delayMs;
+}
+
+// The time limit ran out: the customer leaves unserved, scoring nothing, and the answer is shown.
+export function expireRound(state, now) {
+  if (state.solved) return state;
+  const answer = {
+    endless: () => `The answer was ${formatPence(state.target)}.`,
+    custom: () => `The answer was ${formatPence(state.target)}.`,
+    cashier: () => `The answer was ${formatPence(total(state.pile))}.`,
+    "give-change": () => answerText(state.scenario, changeDue(state.paid, state.price), state.price - state.paid),
+  }[state.mode]();
+  return {
+    ...state,
+    solved: true,
+    unserved: true,
+    solvedAt: now,
+    lastPoints: 0,
+    rounds: state.mode === "custom" ? state.rounds : state.rounds + 1,
+    message: { text: `Customer not served. ${answer}`, kind: "hint" },
+  };
 }
