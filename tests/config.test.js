@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { TIMING_DEFAULTS, GIVE_CHANGE_ODDS, timingFromSearch } from "../src/config.js";
+import { TIMING_DEFAULTS, giveChangeOdds, timingFromSearch } from "../src/config.js";
 
 test("defaults when the search is empty", () => {
   assert.deepEqual(TIMING_DEFAULTS, { dwellMs: 2000, detachHoldMs: 1000, advanceDelayMs: 400 });
@@ -26,9 +26,10 @@ for (const [name, bad] of [["abc", "abc"], ["-5", "-5"], ["1.5", "1.5"], ["10001
   });
 }
 
-test("GIVE_CHANGE_ODDS has per-difficulty underpaid chances", () => {
-  assert.equal(GIVE_CHANGE_ODDS.normal.underpaid, 0.25);
-  assert.equal(GIVE_CHANGE_ODDS.easy.underpaid, 0);
-  assert.equal(GIVE_CHANGE_ODDS.normal.exactShare, 1 / 3);
-  assert.equal(GIVE_CHANGE_ODDS.easy.exactShare, 1 / 3);
+test("giveChangeOdds underpays 25% of customers with Short-paying customers on", () => {
+  assert.deepEqual(giveChangeOdds({ shortPay: true }), { underpaid: 0.25, exactShare: 1 / 3 });
+});
+
+test("giveChangeOdds never underpays with Short-paying customers off", () => {
+  assert.deepEqual(giveChangeOdds({ shortPay: false }), { underpaid: 0, exactShare: 1 / 3 });
 });

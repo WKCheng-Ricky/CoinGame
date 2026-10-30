@@ -4,7 +4,7 @@ import { seq, seeded, pileOf } from "./pile-helper.js";
 import {
   ADVANCE_DELAY_MS, createState, startGame, nextRound,
   addToPile, removeFromPile, clearPile, submitCheck, canAdvance,
-  setDifficulty, moveCoin, settleCoin, addToPileAt, moveGroup, settleGroupCoins,
+  setOption, selectMode, moveCoin, settleCoin, addToPileAt, moveGroup, settleGroupCoins,
   startCashier, nextCustomer, submitAnswer, isContinuous,
   startGiveChange, nextGiveChangeCustomer, submitGiveChangeAnswer,
 } from "../src/state.js";
@@ -24,7 +24,7 @@ test("createState has the expected shape", () => {
   assert.deepEqual(createState(), {
     mode: "endless", target: 0, pile: [], nextUid: 1, rounds: 0, solved: false, solvedAt: 0,
     message: { text: "", kind: "" },
-    difficulty: "normal",
+    options: { showCoins: false, shortPay: true },
     change: [], price: 0, scenario: "",
   });
   assert.equal(ADVANCE_DELAY_MS, 400);
@@ -164,26 +164,46 @@ test("canAdvance uses a custom delay", () => {
   assert.equal(canAdvance(solved, 249, 250), false);
 });
 
-test("setDifficulty switches between easy and normal without touching the round", () => {
+const SHOWN = setOption(createState(), "showCoins", true);
+
+test("setOption turns Show Coins on and off without touching the round", () => {
   const s = withPile(startGame(createState(), "endless", 395), pileOf("£1"));
-  const easy = setDifficulty(s, "easy");
-  assert.equal(easy.difficulty, "easy");
-  assert.deepEqual(easy.pile, s.pile);
-  assert.equal(easy.target, 395);
-  assert.equal(setDifficulty(easy, "normal").difficulty, "normal");
+  const on = setOption(s, "showCoins", true);
+  assert.equal(on.options.showCoins, true);
+  assert.deepEqual(on.pile, s.pile);
+  assert.equal(on.target, 395);
+  assert.equal(setOption(on, "showCoins", false).options.showCoins, false);
 });
 
-test("setDifficulty ignores unknown values and returns the same object", () => {
+test("setOption ignores unknown ids and non-boolean values and returns the same object", () => {
   const s = createState();
-  assert.equal(setDifficulty(s, "hard"), s);
-  assert.equal(setDifficulty(s, undefined), s);
+  assert.equal(setOption(s, "hard", true), s);
+  assert.equal(setOption(s, undefined, true), s);
+  assert.equal(setOption(s, "showCoins", "yes"), s);
 });
 
-test("startGame and nextRound keep the difficulty", () => {
-  const easy = setDifficulty(createState(), "easy");
-  const started = startGame(easy, "custom", 150);
-  assert.equal(started.difficulty, "easy");
-  assert.equal(nextRound(started, 200).difficulty, "easy");
+test("an option of a mode that is not selected can be set and reaches that mode", () => {
+  const s = setOption(createState(), "shortPay", false);
+  assert.equal(s.mode, "endless");
+  assert.equal(startGiveChange(s, { underpaid: 0, exactShare: 1 / 3 }, seeded(1)).options.shortPay, false);
+});
+
+test("selectMode sets the mode and keeps everything else", () => {
+  const s = selectMode(SHOWN, "cashier");
+  assert.equal(s.mode, "cashier");
+  assert.deepEqual(s.options, SHOWN.options);
+});
+
+test("selectMode ignores unknown modes and returns the same object", () => {
+  const s = createState();
+  assert.equal(selectMode(s, "nope"), s);
+  assert.equal(selectMode(s, undefined), s);
+});
+
+test("startGame and nextRound keep the options", () => {
+  const started = startGame(SHOWN, "custom", 150);
+  assert.equal(started.options.showCoins, true);
+  assert.equal(nextRound(started, 200).options.showCoins, true);
 });
 
 test("moveCoin moves one entry to the end with the new position and keeps its other fields", () => {
@@ -423,10 +443,9 @@ test("startCashier starts a fresh cashier game with a handful", () => {
   }
 });
 
-test("startCashier keeps difficulty and resets old state", () => {
-  const easy = setDifficulty(createState(), "easy");
-  assert.equal(startCashier(easy, seeded(1)).difficulty, "easy");
-  const old = { ...easy, rounds: 5, message: { text: "x", kind: "hint" }, pile: pileOf("£1"), nextUid: 2 };
+test("startCashier keeps the options and resets old state", () => {
+  assert.equal(startCashier(SHOWN, seeded(1)).options.showCoins, true);
+  const old = { ...SHOWN, rounds: 5, message: { text: "x", kind: "hint" }, pile: pileOf("£1"), nextUid: 2 };
   const s = startCashier(old, seeded(2));
   assert.equal(s.rounds, 0);
   assert.deepEqual(s.message, { text: "", kind: "" });
@@ -449,6 +468,10 @@ test("startCashier handfuls can stack, and stacked coins stay separate entries",
   }
   assert.ok(stacked > 0);
   assert.ok(plain > 0);
+});
+
+test("nextCustomer keeps the options", () => {
+  assert.equal(nextCustomer(startCashier(SHOWN, seeded(1)), seeded(2)).options.showCoins, true);
 });
 
 test("nextCustomer keeps rounds and mode, resets solved and message, and changes the pile", () => {
@@ -542,13 +565,13 @@ test("startGiveChange never rolls under when underpaid is 0", () => {
   }
 });
 
-test("nextGiveChangeCustomer keeps rounds and difficulty and empties change", () => {
-  let s = startGiveChange(setDifficulty(createState(), "easy"), NORMAL, seeded(3));
+test("nextGiveChangeCustomer keeps rounds and options and empties change", () => {
+  let s = startGiveChange(SHOWN, NORMAL, seeded(3));
   s = { ...s, rounds: 4, solved: true, change: pileOf("20p") };
   const n = nextGiveChangeCustomer(s, NORMAL, seeded(5));
   assert.equal(n.mode, "give-change");
   assert.equal(n.rounds, 4);
-  assert.equal(n.difficulty, "easy");
+  assert.equal(n.options.showCoins, true);
   assert.deepEqual(n.change, []);
   assert.equal(n.solved, false);
   assert.notDeepEqual(n.pile.map((e) => e.coinId).sort(), s.pile.map((e) => e.coinId).sort());

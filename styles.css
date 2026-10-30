@@ -119,22 +119,13 @@ button {
   cursor: pointer;
 }
 button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-/* The three mode buttons all just start a game, so none looks selected: they react to hover and press. */
-@media (hover: hover) { .stack-col button:hover { border-color: var(--accent); background: var(--accent-tint); } }
-.stack-col button:active { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
 button:focus-visible, input:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
 input { width: 100%; padding: 0.5rem 0.75rem; border: 2px solid var(--control-border); background: var(--panel); color: var(--ink); font-size: 1.25rem; }
 label { display: block; margin: 0.5rem 0 0.25rem; }
-input[type="radio"] { width: auto; min-height: 0; }
 
 .choice { width: 100%; max-width: 18.5rem; margin: 0.75rem auto; padding: 0.5rem 0.75rem; border: 2px solid var(--line); border-radius: 0.8rem; background: var(--panel); }
-.choice legend { padding-inline: 0.3rem; color: var(--muted); }
-.difficulty label { display: flex; align-items: center; gap: 0.5rem; min-height: 44px; margin: 0; padding-inline: 0.5rem; border: 2px solid transparent; border-radius: 0.6rem; }
-.difficulty label:has(input:checked) { border-color: var(--accent); background: var(--accent-tint); font-weight: 700; }
-.difficulty input { flex: none; }
 .choice-note { min-height: 1.4em; margin: -0.25rem 0 0.5rem; color: var(--muted); font-size: 0.85rem; }
-.choice .stack-col { margin: 0 auto 0.5rem; }
 
 .coin-edge { stroke: var(--coin-edge); }
 .metal-copper { fill: var(--metal-copper); }
@@ -142,11 +133,10 @@ input[type="radio"] { width: auto; min-height: 0; }
 .metal-gold { fill: var(--metal-gold); }
 .coin-word, .coin-label { fill: var(--coin-ink); }
 .coin-label { transition: opacity 200ms; }
-[data-difficulty="normal"] .coin-label { opacity: 0; }
-[data-difficulty="normal"] .revealed .coin-label { opacity: 1; }
+[data-show-coins="false"] .coin-label { opacity: 0; }
+[data-show-coins="false"] .revealed .coin-label { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .coin-label { transition: none; } }
 
-.stack-col { display: flex; flex-direction: column; gap: 0.75rem; max-width: 16rem; }
 .row { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 0.75rem 0; }
 .error { color: var(--bad); min-height: 1.4em; margin: 0.5rem 0; }
 
@@ -276,10 +266,20 @@ input[type="radio"] { width: auto; min-height: 0; }
 .dock .error { min-height: 0; margin: 0; }
 .dock .error:not(:empty) { margin: 0 0 0.3rem; }
 
+.modes { display: flex; flex-direction: column; gap: 0.5rem; width: 100%; max-width: 18.5rem; margin: 0 auto; }
+.mode { position: relative; display: block; margin: 0; padding: 0.55rem 0.8rem; min-height: 44px; border: 2px solid var(--line); border-radius: 0.7rem; background: var(--panel); text-align: left; cursor: pointer; }
+.mode:has(input:checked) { border-color: var(--accent); background: var(--accent-tint); }
+.mode:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 2px; }
+.mode input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; pointer-events: none; }
+.mode b { display: block; }
+.mode small { display: block; color: var(--muted); font-size: 0.85rem; }
+.options label { display: flex; align-items: center; gap: 0.6rem; min-height: 44px; margin: 0; padding-inline: 0.4rem; text-align: left; }
+.options input { width: 1.2rem; height: 1.2rem; flex: none; }
+h2.sec { width: 100%; max-width: 18.5rem; margin: 0.9rem auto 0.3rem; text-align: left; }
+.play { width: 100%; max-width: 18.5rem; margin: 0.5rem auto 1rem; }
+
 #screen-home, #screen-custom { flex: 1; min-height: 0; overflow-y: auto; }
 #screen-home { position: relative; display: grid; align-content: safe center; justify-items: center; text-align: center; }
-.stack-col { margin-inline: auto; width: 100%; }
-.difficulty label { text-align: left; }
 
 .pile:empty::before { content: "Tap a coin to add it"; color: var(--muted); position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
 #screen-play.locked .coin, #screen-play.locked .pile-coin { opacity: 0.5; }
@@ -332,7 +332,7 @@ input[type="radio"] { width: auto; min-height: 0; }
 #screen-play.give-change .dock > .message { min-height: 1.2em; margin-bottom: 0.2rem; line-height: 1.2; }
 #screen-play.give-change .tray { padding-block: 0.25rem; }
 #screen-play.give-change .actions { margin-top: 0.4rem; }
-/* a short phone (iPhone SE, 375 x 667): less air again, so Easy's total still fits above the dock */
+/* a short phone (iPhone SE, 375 x 667): less air again, so the Show Coins total still fits above the dock */
 @media (max-height: 700px) {
   #screen-play.give-change { gap: 0.3rem; }
   #screen-play.give-change .topbar { padding-block: 0.25rem; }

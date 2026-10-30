@@ -9,7 +9,7 @@ Play it live on https://wkcheng-ricky.github.io/CoinGame/
 ## Highlights
 
 - **Four game modes:** Endless, Custom, Cashier and Give Change.
-- **Two difficulties:** Easy shows coin values and your running total; Normal hides them.
+- **Options:** tick **Show Coins** to see every coin's value and your running total (off is the challenge). Some modes have their own, such as Give Change's **Short-paying customers**.
 - **Hands-on coins:** tap, drag and stack coins. Same coins stack and show a count.
 - **Realistic coins:** real sizes, shapes and wording, plus a 1 cm reference grid so
   near-sized coins (1p and 5p, 20p and 50p) can be compared by eye.
@@ -24,16 +24,16 @@ Play it live on https://wkcheng-ricky.github.io/CoinGame/
 | **Endless** | Build random targets from £0.01 to £9.99, one after another. Press Back to stop. |
 | **Custom** | Type an amount (up to £99.99) and build it with any coins. |
 | **Cashier** | A customer's coins are on the counter. Add them up, type the total and press Check. Next brings the next customer. |
-| **Give Change** | A customer pays for an item. Build their change from the tray and press Check, or press **No change** if they paid exactly or **Not enough!** if they paid too little (Normal only). Next brings the next customer. |
+| **Give Change** | A customer pays for an item. Build their change from the tray and press Check, or press **No change** if they paid exactly or **Not enough!** if they paid too little (with **Short-paying customers** on, the default). Next brings the next customer. |
 
-Pick a mode and a difficulty on Home; one tap on a mode starts it.
+Pick a mode on Home, set any options, then press **Play**.
 
 **Controls (Endless and Custom)**
 
 - Tap a coin in the tray to add it; tap a coin in your pile to remove it.
 - Drag coins around the pile, or from the tray into it. Arrow keys move a focused coin.
 - Dragging a stack moves it together; hold a coin for 1 second to take it off the stack.
-- In Normal, hover, focus or hold a coin for 2 seconds to read its value.
+- With Show Coins off, hover, focus or hold a coin for 2 seconds to read its value.
 - Press **Check** or **Enter** when the total matches. Ctrl/Cmd+Enter works even while a coin or button has focus.
 
 In Cashier, counter coins can be dragged but not added or removed, and Enter in the amount field checks too.
@@ -43,8 +43,8 @@ not added or removed. Below is the "Your change" card with a 6 cm pile (4 cm on 
 as an iPhone SE or a landscape phone): tray coins go there and are tapped, dragged and stacked as in Endless, and
 **Not enough!** and **No change** sit under it. The tray, Check and Clear are at the bottom, as in Endless; Clear
 empties only your change. Every pile and the tray use the same coin size. On a portrait phone (375 × 667 and up) the
-screen fits without scrolling; in a short landscape window the middle scrolls. Easy shows the running total of your
-change and never underpays.
+screen fits without scrolling; in a short landscape window the middle scrolls. Show Coins shows the running total of your
+change, and turning off Short-paying customers means nobody underpays.
 
 ## Quick start
 
