@@ -680,8 +680,11 @@ test("judgeAnswer covers every action and scenario", () => {
   assert.deepEqual(judgeAnswer("over", "check", 266, 265), bad("Too much change"));
   assert.deepEqual(judgeAnswer("over", "check", 264, 265), bad("Not enough change"));
   assert.deepEqual(judgeAnswer("over", "check", 0, 265), bad("Not enough change"));
-  assert.deepEqual(judgeAnswer("exact", "check", 0, 0), bad("Does this customer need change?"));
-  assert.deepEqual(judgeAnswer("under", "check", 0, 0), bad("Does this customer need change?"));
+  // an empty Check means "No change"
+  assert.deepEqual(judgeAnswer("exact", "check", 0, 0), ok);
+  assert.deepEqual(judgeAnswer("under", "check", 0, 0), bad("They have not paid enough yet"));
+  assert.deepEqual(judgeAnswer("exact", "check", 20, 0), bad("Does this customer need change?"));
+  assert.deepEqual(judgeAnswer("under", "check", 20, 0), bad("Does this customer need change?"));
   assert.deepEqual(judgeAnswer("exact", "none", 0, 0), ok);
   assert.deepEqual(judgeAnswer("over", "none", 0, 265), bad("They overpaid, so you owe change"));
   assert.deepEqual(judgeAnswer("under", "none", 0, 0), bad("They have not paid enough yet"));
@@ -690,14 +693,14 @@ test("judgeAnswer covers every action and scenario", () => {
   assert.deepEqual(judgeAnswer("over", "short", 0, 265), bad("They paid enough"));
 });
 
-import { CUSTOMER_BOX_MM, CHANGE_BOX_MM, heightForBox } from "../src/game.js";
+import { CUSTOMER_BOX_MM, CUSTOMER_BOX_COMPACT_MM, CHANGE_BOX_MM, heightForBox } from "../src/game.js";
 
 test("the box constants and heightForBox derive the play-area height from a box edge", () => {
-  assert.equal(CUSTOMER_BOX_MM, 40);
-  assert.equal(CHANGE_BOX_MM, 60);
-  approx(heightForBox(CUSTOMER_BOX_MM), 11.6);
-  approx(heightForBox(CHANGE_BOX_MM), 31.6);
-  approx(heightForBox(CUSTOMER_BOX_MM) + 2 * PILE_MARGIN_MM, 40);
+  assert.equal(CUSTOMER_BOX_MM, 50);
+  assert.equal(CHANGE_BOX_MM, 50);
+  approx(heightForBox(CUSTOMER_BOX_MM), 21.6);
+  approx(heightForBox(CHANGE_BOX_MM), 21.6);
+  approx(heightForBox(CUSTOMER_BOX_MM) + 2 * PILE_MARGIN_MM, 50);
 });
 
 test("with no heightMm placeCoin, settlePile and pileBox equal the 90 mm results", () => {
@@ -723,7 +726,7 @@ test("placeCoin with a short height keeps every centre inside the play area", ()
 });
 
 test("pileBox places the bottom of the play area at the box edge for a given height", () => {
-  const h = heightForBox(CUSTOMER_BOX_MM);
+  const h = heightForBox(CUSTOMER_BOX_COMPACT_MM);
   approx(h + 2 * PILE_MARGIN_MM, 40);
   approx(pileBox({ x: 0, y: 0.5 }, h).top, ((PILE_MARGIN_MM + 1 * h) / (h + 2 * PILE_MARGIN_MM)) * 100);
 });
@@ -740,7 +743,7 @@ test("settlePile and detachNudge measure the y axis in the given height", () => 
 
 test("unitUids and stackCounts measure the link distance in the given height", () => {
   // 0.2 apart in y: 18 mm in a 90 mm area (separate), 2.32 mm in an 11.6 mm area (stacked)
-  const h = heightForBox(CUSTOMER_BOX_MM);
+  const h = heightForBox(CUSTOMER_BOX_COMPACT_MM);
   const pile = [coinAt(1, "20p", 0, 0), coinAt(2, "20p", 0, 0.2)];
   assert.deepEqual(unitUids(pile, 1), [1]);
   assert.deepEqual(unitUids(pile, 1, PILE_HEIGHT_MM), [1]);

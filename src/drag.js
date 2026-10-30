@@ -43,10 +43,32 @@ function paddingRect(el) {
   return { left: b.left + el.clientLeft, top: b.top + el.clientTop, width: el.clientWidth, height: el.clientHeight };
 }
 
-export function createDrag(container, { onMove, onMoveGroup, getGroup, onDragStart, isLocked, onDetach, onDetachEnd, onDetachRelease, holdMs = DETACH_HOLD_MS, heightMm = PILE_HEIGHT_MM }) {
+// A fixed-position copy of a pile coin on <body>, so it stays visible over either pile.
+function makeGhost(m) {
+  const r = m.getBoundingClientRect();
+  const ghost = document.createElement("div");
+  ghost.className = "tray-ghost";
+  ghost.setAttribute("aria-hidden", "true");
+  ghost.style.position = "fixed";
+  ghost.style.pointerEvents = "none";
+  ghost.style.width = `${r.width}px`;
+  ghost.style.height = `${r.width}px`;
+  const svg = m.querySelector("svg");
+  if (svg) ghost.append(svg.cloneNode(true));
+  if (m.classList.contains("revealed")) ghost.classList.add("revealed");
+  document.body.append(ghost);
+  return { ghost, left: r.left, top: r.top };
+}
+
+// dropTarget(point) returns the pile { key, el, heightMm } under a viewport point, or null.
+// It is asked once with the start point when a drag starts: null keeps the classic in-pile
+// drag; otherwise the drag is drawn as body ghosts, asked again on every move (to highlight
+// the other pile) and at the release, where another pile's el calls onTransfer instead of
+// onMove / onMoveGroup.
+export function createDrag(container, { onMove, onMoveGroup, getGroup, onDragStart, isLocked, onDetach, onDetachEnd, onDetachRelease, holdMs = DETACH_HOLD_MS, heightMm = PILE_HEIGHT_MM, dropTarget, onTransfer }) {
   const height = () => (typeof heightMm === "function" ? heightMm() : heightMm);
   let suppress = false;
-  // { id, type, el, uid, uids, members, startX, startY, offX, offY, dragging, group, single, timer }
+  // { id, type, el, uid, uids, members, startX, startY, offX, offY, dragging, group, single, timer, ghosts, over }
   let track = null;
 
   // clears the hold timer and every trace of the drag on every member; calls nothing
@@ -60,10 +82,14 @@ export function createDrag(container, { onMove, onMoveGroup, getGroup, onDragSta
     clearTimeout(t.timer);
     t.timer = null;
     for (const m of t.members) {
-      m.classList.remove("dragging", "detached");
+      m.classList.remove("dragging", "detached", "dragging-source");
       m.style.removeProperty("--dx");
       m.style.removeProperty("--dy");
     }
+    for (const g of t.ghosts ?? []) g.ghost.remove();
+    t.ghosts = null;
+    t.over?.classList.remove("over-pile");
+    t.over = null;
     endDetach(t);
   };
 
@@ -106,7 +132,7 @@ export function createDrag(container, { onMove, onMoveGroup, getGroup, onDragSta
     const t = {
       id: e.pointerId, type: e.pointerType, el, uid, uids, members, startX: e.clientX, startY: e.clientY,
       offX: r.left + r.width / 2 - e.clientX, offY: r.top + r.height / 2 - e.clientY,
-      dragging: false, group: false, single: uids.length === 1, timer: null,
+      dragging: false, group: false, single: uids.length === 1, timer: null, ghosts: null, over: null,
     };
     track = t;
     if (uids.length > 1) {
@@ -135,9 +161,27 @@ export function createDrag(container, { onMove, onMoveGroup, getGroup, onDragSta
       t.timer = null;
       t.dragging = true;
       t.group = !t.single;
-      for (const m of t.group ? t.members : [t.el]) m.classList.add("dragging");
+      const moved = t.group ? t.members : [t.el];
+      if (dropTarget?.({ x: t.startX, y: t.startY })) {
+        t.ghosts = moved.map(makeGhost);
+        for (const m of moved) m.classList.add("dragging-source");
+      } else {
+        for (const m of moved) m.classList.add("dragging");
+      }
       suppress = true;
       onDragStart(t.el);
+    }
+    if (t.ghosts) {
+      for (const g of t.ghosts) g.ghost.style.transform = `translate(${g.left + dx}px, ${g.top + dy}px)`;
+      // only another pile is highlighted, never the drag's own
+      const el = dropTarget({ x: e.clientX, y: e.clientY })?.el;
+      const over = el && el !== container ? el : null;
+      if (over !== t.over) {
+        t.over?.classList.remove("over-pile");
+        over?.classList.add("over-pile");
+        t.over = over;
+      }
+      return;
     }
     for (const m of t.group ? t.members : [t.el]) {
       m.style.setProperty("--dx", `${dx}px`);
@@ -156,7 +200,18 @@ export function createDrag(container, { onMove, onMoveGroup, getGroup, onDragSta
       return;
     } // otherwise a tap is a tap
     const rect = paddingRect(container);
+    const ghosted = !!t.ghosts;
     restore(t);
+    if (ghosted) {
+      const over = dropTarget({ x: e.clientX, y: e.clientY });
+      if (!over) return; // outside both piles: the coin stays where it was
+      if (over.el !== container) {
+        const leader = { x: e.clientX + t.offX, y: e.clientY + t.offY };
+        const { x, y } = toPileFraction(leader, paddingRect(over.el), over.heightMm);
+        onTransfer?.(t.group ? t.uids : [t.uid], t.uid, over.key, x, y);
+        return;
+      }
+    }
     // removing .dragging must not enable the glide; main.js clears this after its style flush
     const flat = t.group ? t.members : [t.el];
     for (const m of flat) m.style.transition = "none";

@@ -38,13 +38,16 @@ Pick a mode on Home, set any options, then press **Play**.
 
 In Cashier, counter coins can be dragged but not added or removed, and Enter in the amount field checks too.
 
-In Give Change, the customer's coins sit in the top bar under the price, in a 4 cm strip; they can be dragged apart but
-not added or removed. Below is the "Your change" card with a 6 cm pile (4 cm on screens shorter than 700 px, such
-as an iPhone SE or a landscape phone): tray coins go there and are tapped, dragged and stacked as in Endless, and
-**Not enough!** and **No change** sit under it. The tray, Check and Clear are at the bottom, as in Endless; Clear
-empties only your change. Every pile and the tray use the same coin size. On a portrait phone (375 × 667 and up) the
-screen fits without scrolling; in a short landscape window the middle scrolls. Show Coins shows the running total of your
-change, and turning off Short-paying customers means nobody underpays.
+In Give Change, the customer's coins sit in the top bar under the price. Below is the "Your change" card: tray coins go
+there and are tapped, dragged and stacked as in Endless, and **Not enough!** and **No change** sit under it. Both piles
+are 5 cm (4 cm on screens shorter than 700 px, such as an iPhone SE or a landscape phone). Coins can be dragged between
+the customer's pile and your change, either way. The customer's coins can be moved to your change but never added or
+removed: tapping one sends it to your change pile, and tapping it there sends it back. Giving back more than they paid
+is refused with a hint to press Clear. The tray, Check and Clear are at the bottom, as in Endless; Clear puts the
+customer's coins back as they paid them and empties your change. Pressing Check with no change counts as **No change**.
+Every pile and the tray use the same coin size. On a portrait phone (375 × 667 and up) the screen fits without
+scrolling; in a short landscape window the middle scrolls. Show Coins shows the running total of your change, and
+turning off Short-paying customers means nobody underpays.
 
 ## Quick start
 
