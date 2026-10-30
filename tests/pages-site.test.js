@@ -42,8 +42,15 @@ test("no reference is root-absolute", () => {
   for (const ref of localReferences()) assert.ok(!ref.startsWith("/"), `${ref} must be relative`);
 });
 
-test("deploy runs only for pushes to main, after unit and e2e", () => {
-  assert.deepEqual(wf.jobs.deploy.needs, ["unit", "e2e"]);
+// The e2e job is paused (`if: false`), so deploy must not wait on it: a skipped dependency would skip the
+// deploy too. Re-enabling e2e means dropping its `if` and adding it back to deploy's `needs` (and here).
+test("e2e is paused and deploy waits only on unit", () => {
+  assert.equal(wf.jobs.e2e.if, false);
+  assert.deepEqual(wf.jobs.deploy.needs, ["unit"]);
+});
+
+test("deploy runs only for pushes to main, after the unit job", () => {
+  assert.deepEqual(wf.jobs.deploy.needs, ["unit"]);
   const cond = wf.jobs.deploy.if;
   assert.equal(typeof cond, "string");
   assert.ok(cond.includes("github.event_name == 'push'"));

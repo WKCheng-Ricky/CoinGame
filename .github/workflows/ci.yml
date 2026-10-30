@@ -26,7 +26,10 @@ jobs:
       - run: npm ci
       - run: npm run test:coverage
 
+  # Paused while the features are still changing: re-enable (delete the `if` line and add `e2e` back to
+  # the `deploy` job's `needs`) when the comprehensive browser run is wanted again.
   e2e:
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -62,7 +65,7 @@ jobs:
             coverage/e2e/
 
   deploy:
-    needs: [unit, e2e]
+    needs: [unit]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10

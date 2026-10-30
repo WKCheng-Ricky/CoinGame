@@ -86,9 +86,11 @@ number of milliseconds from 0 to 10000.
 
 Live at https://wkcheng-ricky.github.io/CoinGame/.
 
-Every push to `main` runs CI; if the `unit` and `e2e` jobs pass, the `deploy` job
-publishes `index.html`, `styles.css`, `theme-boot.js`, `src/` and `fonts/` to GitHub
-Pages. Pull requests run CI but never deploy.
+Every push to `main` runs CI; if the `unit` job passes, the `deploy` job publishes
+`index.html`, `styles.css`, `theme-boot.js`, `src/` and `fonts/` to GitHub Pages. Pull
+requests run CI but never deploy. The `e2e` browser job is paused for now (`if: false` in
+`.github/workflows/ci.yml`; the e2e specs and `npm run test:e2e` still work locally), and
+re-enabling it means deleting that line and adding `e2e` back to the `deploy` job's `needs`.
 
 One-time setup: set Pages > Source to "GitHub Actions" in the repository settings.
 Any static host also works, since there is no build step.
