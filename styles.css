@@ -288,6 +288,7 @@ h2.sec { width: 100%; max-width: 18.5rem; margin: 0.9rem auto 0.3rem; text-align
 
 .coin { touch-action: none; cursor: grab; }
 .coin.dragging-source { opacity: 0.5; }
+.pile-coin.dragging-source { opacity: 0.5; }
 .tray-ghost { position: fixed; left: 0; top: 0; z-index: 2000; pointer-events: none; filter: drop-shadow(0 3px 4px var(--lift-shadow)); }
 .tray-ghost svg { display: block; width: 100%; height: 100%; }
 .pile.over-pile { outline: 3px solid var(--accent); outline-offset: -3px; }

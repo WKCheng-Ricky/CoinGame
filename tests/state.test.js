@@ -6,7 +6,7 @@ import {
   addToPile, removeFromPile, clearPile, submitCheck, canAdvance,
   setOption, selectMode, moveCoin, settleCoin, addToPileAt, moveGroup, settleGroupCoins,
   startCashier, nextCustomer, submitAnswer, isContinuous,
-  startGiveChange, nextGiveChangeCustomer, submitGiveChangeAnswer,
+  startGiveChange, nextGiveChangeCustomer, submitGiveChangeAnswer, transferCoins, sendCoin,
 } from "../src/state.js";
 import { formatPence, randomHandful, stackCounts, total, PUSH_FACTOR, PILE_WIDTH_MM, PILE_HEIGHT_MM, STACK_STEP_MM, detachNudge } from "../src/game.js";
 import { coinById } from "../src/coins.js";
@@ -25,7 +25,7 @@ test("createState has the expected shape", () => {
     mode: "endless", target: 0, pile: [], nextUid: 1, rounds: 0, solved: false, solvedAt: 0,
     message: { text: "", kind: "" },
     options: { showCoins: false, shortPay: true },
-    change: [], price: 0, scenario: "",
+    change: [], price: 0, scenario: "", paid: 0, dealt: [],
   });
   assert.equal(ADVANCE_DELAY_MS, 400);
 });
@@ -474,6 +474,14 @@ test("nextCustomer keeps the options", () => {
   assert.equal(nextCustomer(startCashier(SHOWN, seeded(1)), seeded(2)).options.showCoins, true);
 });
 
+test("nextCustomer in Cashier mode avoids repeating the previous handful (its read-only pile, not dealt)", () => {
+  for (let seed = 1; seed <= 20; seed++) {
+    const first = startCashier(createState(), seeded(seed));
+    const next = nextCustomer(first, seeded(seed)); // the same draw would repeat the handful without avoidance
+    assert.notDeepEqual(next.pile.map((e) => e.coinId).sort(), first.pile.map((e) => e.coinId).sort());
+  }
+});
+
 test("nextCustomer keeps rounds and mode, resets solved and message, and changes the pile", () => {
   const first = startCashier(createState(), seeded(4));
   const solved = submitAnswer(first, total(first.pile), 100);
@@ -618,7 +626,7 @@ test("move and settle work on either key", () => {
 });
 
 test("submitGiveChangeAnswer judges the change against what is due", () => {
-  const base = { ...startGiveChange(createState(), NORMAL, seeded(1)), pile: pileOf("£2"), scenario: "over", price: 125 };
+  const base = { ...startGiveChange(createState(), NORMAL, seeded(1)), pile: pileOf("£2"), paid: 200, scenario: "over", price: 125 };
   // due is 75p
   const wrong = submitGiveChangeAnswer({ ...base, change: pileOf("50p") }, "check", 100);
   assert.equal(wrong.message.kind, "hint");
@@ -647,12 +655,12 @@ test("submitGiveChangeAnswer accepts none and short on matching scenarios", () =
 test("submitGiveChangeAnswer success messages are plain", () => {
   const base = startGiveChange(createState(), NORMAL, seeded(1));
   const check = submitGiveChangeAnswer(
-    { ...base, pile: pileOf("£2", "£2", "£1"), scenario: "over", price: 235, change: pileOf("£2", "50p", "10p", "5p") }, "check", 1);
+    { ...base, pile: pileOf("£2", "£2", "£1"), paid: 500, scenario: "over", price: 235, change: pileOf("£2", "50p", "10p", "5p") }, "check", 1);
   assert.equal(check.message.text, "Correct! Change: £2.65.");
   assert.equal(check.message.kind, "success");
-  const none = submitGiveChangeAnswer({ ...base, pile: pileOf("£1"), scenario: "exact", price: 100 }, "none", 1);
+  const none = submitGiveChangeAnswer({ ...base, pile: pileOf("£1"), paid: 100, scenario: "exact", price: 100 }, "none", 1);
   assert.equal(none.message.text, "Correct! No change due.");
-  const short = submitGiveChangeAnswer({ ...base, pile: pileOf("£1"), scenario: "under", price: 140 }, "short", 1);
+  const short = submitGiveChangeAnswer({ ...base, pile: pileOf("£1"), paid: 100, scenario: "under", price: 140 }, "short", 1);
   assert.equal(short.message.text, "Correct! They are £0.40 short.");
 });
 
@@ -695,9 +703,9 @@ function dealAt(seed, h) {
 
 test("pileHeightMm gives the short customer and change heights in Give Change only", () => {
   const giveChange = startGiveChange(createState(), NORMAL, seeded(1));
-  near(pileHeightMm(giveChange), 11.6);
-  near(pileHeightMm(giveChange, "pile"), 11.6);
-  near(pileHeightMm(giveChange, "change"), 31.6);
+  near(pileHeightMm(giveChange), 21.6);
+  near(pileHeightMm(giveChange, "pile"), 21.6);
+  near(pileHeightMm(giveChange, "change"), 21.6);
   for (const s of [startCashier(createState(), seeded(1)), startGame(createState(), "endless", 100)]) {
     assert.equal(pileHeightMm(s), 90);
     assert.equal(pileHeightMm(s, "pile"), 90);
@@ -712,7 +720,7 @@ test("startGiveChange deals the customer's coins into the short play area", () =
     const s = startGiveChange(createState(), NORMAL, seeded(seed));
     if (s.pile.length === 12) full++;
     for (const e of s.pile) assert.ok(Math.abs(e.y) * CUSTOMER_H <= CUSTOMER_H / 2 + 1e-9);
-    assert.deepEqual(s.pile, dealAt(seed, CUSTOMER_H));
+    assert.deepEqual(s.pile.map(({ customer, ...e }) => e), dealAt(seed, CUSTOMER_H)); // the flag is not part of the deal
     if (differentCoinsApart(s.pile, CUSTOMER_H)) apart++;
   }
   assert.ok(full > 0, "some deals are full 12-coin handfuls");
@@ -729,7 +737,7 @@ test("startCashier and nextCustomer still deal at the 90 mm height", () => {
   assert.ok(differentCoinsApart(next.pile, PILE_HEIGHT_MM));
 });
 
-test("moveCoin and settleCoin on the Give Change customer pile push apart by the 11.6 mm amount", () => {
+test("moveCoin and settleCoin on the Give Change customer pile push apart by the 21.6 mm amount", () => {
   // a pair 1 mm apart in y and 3 mm in x, so the push is mostly sideways and stays inside the short area
   const dx = 3 / PILE_WIDTH_MM;
   const dy = 1 / CUSTOMER_H;
@@ -743,17 +751,19 @@ test("moveCoin and settleCoin on the Give Change customer pile push apart by the
   near(mmApart(group.pile[0], group.pile[1], CUSTOMER_H), want, 1e-6);
 });
 
-test("adding to the Give Change player's pile places and settles at 31.6 mm", () => {
+test("adding to the Give Change player's pile places and settles at 21.6 mm", () => {
   const base = { ...startGiveChange(createState(), NORMAL, seeded(1)), change: [e(1, "20p", 0.01, 0.02)], nextUid: 50 };
   const out = addToPile(base, "1p", seq([0.5, 0.5], 0.5), "change");
   const want = PUSH_FACTOR * (coinById("20p").diameter + coinById("1p").diameter) / 2;
   near(mmApart(out.change[0], out.change[1], CHANGE_H), want, 1e-6);
 });
 
-// ---- compact (screens under 700 px high): the player's pile drops to the 4 cm box too ----
-import { CHANGE_BOX_COMPACT_MM } from "../src/game.js";
+// ---- compact (screens under 700 px high): both piles drop to the 4 cm box ----
+import { CHANGE_BOX_COMPACT_MM, CUSTOMER_BOX_COMPACT_MM } from "../src/game.js";
 
-test("CHANGE_BOX_COMPACT_MM is the 4 cm box", () => {
+test("CUSTOMER_BOX_COMPACT_MM and CHANGE_BOX_COMPACT_MM are both the 4 cm box", () => {
+  assert.equal(CUSTOMER_BOX_COMPACT_MM, 40);
+  near(heightForBox(CUSTOMER_BOX_COMPACT_MM), 11.6);
   assert.equal(CHANGE_BOX_COMPACT_MM, 40);
 });
 
@@ -761,27 +771,261 @@ test("pileHeightMm with compact gives 11.6 mm for both Give Change piles and 90 
   const giveChange = startGiveChange(createState(), NORMAL, seeded(1));
   near(pileHeightMm(giveChange, "pile", true), 11.6);
   near(pileHeightMm(giveChange, "change", true), 11.6);
-  near(pileHeightMm(giveChange, "change", false), 31.6);
+  near(pileHeightMm(giveChange, "change", false), 21.6);
+  near(pileHeightMm(giveChange, "pile", false), 21.6);
   for (const s of [startCashier(createState(), seeded(1)), startGame(createState(), "endless", 100), startGame(createState(), "custom", 100)]) {
     assert.equal(pileHeightMm(s, "pile", true), 90);
     assert.equal(pileHeightMm(s, "change", true), 90);
   }
 });
 
+const COMPACT_H = heightForBox(CUSTOMER_BOX_COMPACT_MM);
+
 test("addToPile, settleCoin and settleGroupCoins on the change pile use the compact height when asked", () => {
   const want = PUSH_FACTOR * (coinById("20p").diameter + coinById("1p").diameter) / 2;
   const base = { ...startGiveChange(createState(), NORMAL, seeded(1)), change: [e(1, "20p", 0.01, 0.02)], nextUid: 50 };
   const added = addToPile(base, "1p", seq([0.5, 0.5], 0.5), "change", true);
-  near(mmApart(added.change[0], added.change[1], CUSTOMER_H), want, 1e-6);
+  near(mmApart(added.change[0], added.change[1], COMPACT_H), want, 1e-6);
 
   const dx = 3 / PILE_WIDTH_MM;
-  const dy = 1 / CUSTOMER_H;
+  const dy = 1 / COMPACT_H;
   const s = { ...base, change: [e(1, "20p", 0, 0), e(2, "1p", 0.3, 0.3)] };
   const out = settleCoin(moveCoin(s, 2, dx, dy, "change"), 2, { x: 0.3, y: 0.3 }, "change", true);
-  near(mmApart(out.change[0], out.change[1], CUSTOMER_H), want, 1e-6);
+  near(mmApart(out.change[0], out.change[1], COMPACT_H), want, 1e-6);
   const group = settleGroupCoins({ ...s, change: [e(1, "20p", 0, 0), e(2, "1p", dx, dy)] }, [2], 2, null, "change", true);
-  near(mmApart(group.change[0], group.change[1], CUSTOMER_H), want, 1e-6);
-  // without the flag the same moves settle at 31.6 mm
+  near(mmApart(group.change[0], group.change[1], COMPACT_H), want, 1e-6);
+  // without the flag the same moves settle at the full 21.6 mm
   const tall = settleGroupCoins({ ...s, change: [e(1, "20p", 0, 0), e(2, "1p", dx, dy)] }, [2], 2, null, "change");
-  assert.ok(Math.abs(mmApart(tall.change[0], tall.change[1], CUSTOMER_H) - want) > 1e-3);
+  assert.ok(Math.abs(mmApart(tall.change[0], tall.change[1], COMPACT_H) - want) > 1e-3);
+});
+
+// ---- paid amount, Clear and transfers between the Give Change piles ----
+
+const REFUSED = { text: "That is more than they paid. Press Clear to start again.", kind: "hint" };
+
+// A Give Change round with fixed amounts: the customer pile is also the dealt pile.
+function round(pile, { paid = total(pile), price = paid - 50, scenario = "over", change = [] } = {}) {
+  return { ...startGiveChange(createState(), NORMAL, seeded(1)), pile, dealt: pile, paid, price, scenario, change, nextUid: 50 };
+}
+
+test("createState has no paid amount and no dealt pile", () => {
+  const s = createState();
+  assert.equal(s.paid, 0);
+  assert.deepEqual(s.dealt, []);
+});
+
+test("startGiveChange and nextGiveChangeCustomer store the paid amount and the dealt pile", () => {
+  const s = startGiveChange(createState(), NORMAL, seeded(7));
+  assert.equal(s.paid, total(s.pile));
+  assert.deepEqual(s.dealt, s.pile);
+  const n = nextGiveChangeCustomer(s, NORMAL, seeded(5));
+  assert.equal(n.paid, total(n.pile));
+  assert.deepEqual(n.dealt, n.pile);
+});
+
+test("every dealt customer coin is flagged as the customer's, in the pile and in dealt", () => {
+  const s = startGiveChange(createState(), NORMAL, seeded(3));
+  assert.ok(s.pile.length > 0);
+  assert.ok(s.pile.every((e) => e.customer === true));
+  assert.ok(s.dealt.every((e) => e.customer === true));
+});
+
+test("a customer coin moved to the change pile cannot be removed by tapping it", () => {
+  const s = startGiveChange(createState(), NORMAL, seeded(3));
+  const lead = s.pile[0];
+  const t = transferCoins(s, [lead.uid], lead.uid, "pile", "change", 0.1, 0.1);
+  assert.equal(t.change[0].customer, true);
+  assert.equal(removeFromPile(t, t.change[0].uid, "change"), t);
+});
+
+test("a customer coin stays unremovable after a round trip, while your own tray coins stay removable", () => {
+  const s = round(pileOf("\u00a31", "50p"), { price: 120 });
+  const own = { ...s, pile: s.pile.map((e) => ({ ...e, customer: true })) };
+  const out = transferCoins(own, [2], 2, "pile", "change", 0.1, 0.1);
+  const withTray = addToPile(out, "20p", seeded(1), "change");
+  const trayUid = withTray.change.at(-1).uid;
+  const inPile = transferCoins(withTray, [trayUid], trayUid, "change", "pile", 0.2, 0.2);
+  const back = transferCoins(inPile, [inPile.pile.at(-1).uid], inPile.pile.at(-1).uid, "pile", "change", 0.3, 0.3);
+  const tray = back.change.find((e) => e.coinId === "20p");
+  const kept = back.change.find((e) => e.coinId === "50p");
+  assert.equal(tray.customer, undefined);
+  assert.equal(removeFromPile(back, kept.uid, "change"), back);
+  assert.equal(removeFromPile(back, tray.uid, "change").change.some((e) => e.uid === tray.uid), false);
+});
+
+const theirs = (pile) => pile.map((e) => ({ ...e, customer: true }));
+
+test("sendCoin moves the tapped customer coin, and only it, to the change pile", () => {
+  const s = round(theirs(pileOf("\u00a31", "50p", "20p")), { price: 120 });
+  const t = sendCoin(s, 2, "pile", seeded(4));
+  assert.deepEqual(t.pile.map((e) => e.uid), [1, 3]);
+  assert.equal(t.change.length, 1);
+  assert.equal(t.change[0].coinId, "50p");
+  assert.equal(t.change[0].customer, true);
+  assert.ok(Math.abs(t.change[0].x) <= 0.5 && Math.abs(t.change[0].y) <= 0.5);
+  assert.equal(t.paid, s.paid);
+  assert.equal(t.price, 120);
+  assert.equal(t.scenario, "over");
+});
+
+test("sendCoin sends a customer coin in the change pile back to the customer pile", () => {
+  const s = round(theirs(pileOf("\u00a31", "50p")), { price: 120 });
+  const out = sendCoin(s, 2, "pile", seeded(4));
+  const back = sendCoin(out, out.change[0].uid, "change", seeded(5));
+  assert.deepEqual(back.change, []);
+  assert.deepEqual(back.pile.map((e) => e.coinId).sort(), ["50p", "\u00a31"]);
+  assert.ok(back.pile.every((e) => e.customer === true));
+});
+
+test("sendCoin back is refused with the Clear hint when the customer pile would exceed what they paid", () => {
+  const s = { ...round(theirs(pileOf("\u00a31")), { paid: 100, price: 50 }), change: theirs(pileOf("50p")) };
+  const t = sendCoin(s, 1, "change", seeded(4));
+  assert.equal(t.pile, s.pile);
+  assert.equal(t.change, s.change);
+  assert.equal(t.message.kind, "hint");
+  assert.match(t.message.text, /Press Clear/);
+});
+
+test("sendCoin leaves your own change coins to be removed, and sends an own coin out of the customer pile", () => {
+  const s = round(theirs(pileOf("\u00a31")), { paid: 100, price: 50 });
+  const own = addToPile(s, "20p", seeded(1), "change");
+  assert.equal(sendCoin(own, own.change[0].uid, "change", seeded(2)), own);
+  const inPile = { ...s, pile: [...s.pile, { uid: 9, coinId: "20p", x: 0, y: 0, rot: 0 }] };
+  const t = sendCoin(inPile, 9, "pile", seeded(2));
+  assert.deepEqual(t.change.map((e) => e.coinId), ["20p"]);
+});
+
+test("sendCoin ignores a solved round, other modes, unknown coins and bad keys", () => {
+  const s = round(theirs(pileOf("\u00a31", "50p")), { price: 120 });
+  const solved = { ...s, solved: true };
+  assert.equal(sendCoin(solved, 1, "pile", seeded(1)), solved);
+  const endless = { ...s, mode: "endless" };
+  assert.equal(sendCoin(endless, 1, "pile", seeded(1)), endless);
+  assert.equal(sendCoin(s, 99, "pile", seeded(1)), s);
+  assert.equal(sendCoin(s, 1, "tray", seeded(1)), s);
+  assert.equal(sendCoin(s, 1, "options", seeded(1)), s);
+});
+
+test("transferCoins moves a customer coin to the change pile with a new uid", () => {
+  const s = round(pileOf("£1", "50p"), { price: 120 });
+  const t = transferCoins(s, [2], 2, "pile", "change", 0.1, 0.1);
+  assert.deepEqual(t.pile.map((e) => e.coinId), ["£1"]);
+  assert.equal(t.change.length, 1);
+  assert.equal(t.change[0].coinId, "50p");
+  assert.equal(t.change[0].uid, 50);
+  assert.equal(t.nextUid, 51);
+  assert.equal(t.paid, 150);
+  assert.equal(t.price, 120);
+  assert.equal(t.scenario, "over");
+});
+
+test("transferCoins moves a change coin back to the customer pile within the limit", () => {
+  const s = round(pileOf("£1", "50p"));
+  const out = transferCoins(s, [2], 2, "pile", "change", 0.1, 0.1);
+  const back = transferCoins({ ...out, message: { text: "x", kind: "hint" } }, [50], 50, "change", "pile", 0, 0);
+  assert.deepEqual(back.pile.map((e) => e.coinId), ["£1", "50p"]);
+  assert.equal(back.pile[1].uid, 51);
+  assert.deepEqual(back.change, []);
+  assert.deepEqual(back.message, { text: "", kind: "" });
+});
+
+test("transferCoins refuses a move that takes the customer pile over what they paid", () => {
+  const s = round(pileOf("£1"), { paid: 100, change: [e(60, "20p", 0, 0)] });
+  const r = transferCoins(s, [60], 60, "change", "pile", 0, 0);
+  assert.equal(r.pile, s.pile);
+  assert.equal(r.change, s.change);
+  assert.deepEqual(r.message, REFUSED);
+});
+
+test("transferCoins refuses a group over the limit as a whole", () => {
+  const s = round(pileOf("£1"), { paid: 150, change: [e(60, "50p", -0.3, 0), e(61, "20p", 0.3, 0)] });
+  assert.equal(transferCoins(s, [60], 60, "change", "pile", 0, 0).pile.length, 2);
+  const r = transferCoins(s, [60, 61], 61, "change", "pile", 0, 0);
+  assert.equal(r.pile, s.pile);
+  assert.equal(r.change, s.change);
+  assert.deepEqual(r.message, REFUSED);
+});
+
+test("transferCoins moves a group keeping offsets, with the leader last at the clamped drop point", () => {
+  const pile = [e(1, "5p", 0.1, 0), e(2, "£2", -0.3, 0), e(3, "1p", -0.1, 0), e(4, "£1", 0.3, 0.4)];
+  const s = round(pile);
+  const t = transferCoins(s, [1, 2, 3], 1, "pile", "change", 0.8, 0.2);
+  assert.deepEqual(t.pile.map((x) => x.uid), [4]);
+  assert.deepEqual(t.change.map((x) => x.coinId), ["£2", "1p", "5p"]);
+  assert.deepEqual(t.change.map((x) => x.uid), [50, 51, 52]);
+  assert.equal(t.nextUid, 53);
+  near(t.change[2].x, 0.5);
+  near(t.change[2].y, 0.2);
+  near(t.change[0].x, 0.1);
+  near(t.change[0].y, 0.2);
+  near(t.change[1].x, 0.3);
+  near(t.change[1].y, 0.2);
+});
+
+test("transferCoins works in exact and underpaid rounds without changing the round", () => {
+  for (const [scenario, price] of [["exact", 150], ["under", 200]]) {
+    const s = round(pileOf("£1", "50p"), { price, scenario });
+    const t = transferCoins(s, [2], 2, "pile", "change", 0, 0);
+    assert.equal(t.change.length, 1);
+    assert.equal(t.scenario, scenario);
+    assert.equal(t.price, price);
+    assert.equal(t.paid, 150);
+  }
+});
+
+test("transferCoins returns the same state when the move is not allowed", () => {
+  const s = round(pileOf("£1", "50p"));
+  const endless = { ...createState(), pile: pileOf("£1", "50p") };
+  assert.equal(transferCoins(endless, [2], 2, "pile", "change", 0, 0), endless);
+  const solved = { ...s, solved: true };
+  assert.equal(transferCoins(solved, [2], 2, "pile", "change", 0, 0), solved);
+  assert.equal(transferCoins(s, [2], 2, "pile", "pile", 0, 0), s);
+  assert.equal(transferCoins(s, [2], 2, "tray", "change", 0, 0), s);
+  assert.equal(transferCoins(s, [2], 2, "pile", "tray", 0, 0), s);
+  assert.equal(transferCoins(s, [2], 99, "pile", "change", 0, 0), s);
+});
+
+test("submitGiveChangeAnswer judges against the paid amount after transfers", () => {
+  const over = transferCoins(round(pileOf("£2", "50p"), { price: 200 }), [2], 2, "pile", "change", 0, 0);
+  const right = submitGiveChangeAnswer(over, "check", 1);
+  assert.equal(right.solved, true);
+  assert.equal(right.message.text, "Correct! Change: £0.50.");
+
+  const exact = transferCoins(round(pileOf("£1", "50p"), { price: 150, scenario: "exact" }), [2], 2, "pile", "change", 0, 0);
+  assert.equal(submitGiveChangeAnswer(exact, "none", 1).solved, true);
+
+  const under = transferCoins(round(pileOf("£1", "50p"), { price: 190, scenario: "under" }), [2], 2, "pile", "change", 0, 0);
+  const short = submitGiveChangeAnswer(under, "short", 1);
+  assert.equal(short.solved, true);
+  assert.equal(short.message.text, "Correct! They are £0.40 short.");
+});
+
+test("clearPile on the change pile restores the dealt customer pile in Give Change", () => {
+  const s = round(pileOf("£1", "50p", "20p"));
+  let t = transferCoins(s, [2], 2, "pile", "change", -0.2, 0);
+  t = transferCoins(t, [3], 3, "pile", "change", 0.2, 0);
+  t = removeFromPile(t, t.change[1].uid, "change");
+  t = { ...t, message: { text: "x", kind: "hint" } };
+  const c = clearPile(t, "change");
+  assert.deepEqual(c.pile, s.dealt);
+  assert.deepEqual(c.change, []);
+  assert.deepEqual(c.message, { text: "", kind: "" });
+  const solved = { ...t, solved: true };
+  assert.equal(clearPile(solved, "change"), solved);
+});
+
+test("two refusals in a row give distinct but equal message objects, so each one is announced", () => {
+  const s = round(pileOf("£1"), { paid: 100, change: [e(60, "20p", 0, 0)] });
+  const a = transferCoins(s, [60], 60, "change", "pile", 0, 0).message;
+  const b = transferCoins(s, [60], 60, "change", "pile", 0, 0).message;
+  assert.notEqual(a, b);
+  assert.deepEqual(a, b);
+});
+
+test("nextGiveChangeCustomer avoids repeating the dealt handful even when the customer pile was emptied", () => {
+  const first = randomHandful(seeded(5)).slice().sort().join(",");
+  const base = startGiveChange(createState(), NORMAL, seeded(5));
+  const s = { ...base, pile: [], change: base.dealt };
+  const n = nextGiveChangeCustomer(s, NORMAL, seeded(5));
+  assert.notEqual(n.dealt.map((c) => c.coinId).sort().join(","), first);
 });

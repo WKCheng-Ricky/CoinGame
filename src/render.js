@@ -156,14 +156,14 @@ export function renderPile(container, pile, excludeUid = null, removable = true,
     if (btn && btn.dataset.coin !== entry.coinId) { btn.remove(); btn = undefined; }
     if (!btn) {
       const coin = COINS.find((c) => c.id === entry.coinId);
-      btn = coinButton(coin, "pile-coin settle", coinLabel(coin, removable));
+      btn = coinButton(coin, "pile-coin settle", coinLabel(coin, removable && !entry.customer));
       btn.setAttribute("aria-description", "Use arrow keys to move");
       btn.dataset.uid = key;
       placeCoin(btn, entry, heightMm);
       btn.addEventListener("animationend", () => btn.classList.remove("settle"), { once: true });
       container.append(btn);
     } else {
-      btn.setAttribute("aria-label", coinLabel(COINS.find((c) => c.id === entry.coinId), removable));
+      btn.setAttribute("aria-label", coinLabel(COINS.find((c) => c.id === entry.coinId), removable && !entry.customer));
       placeCoin(btn, entry, heightMm);
     }
     return btn;

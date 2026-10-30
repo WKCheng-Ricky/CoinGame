@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { installDom, pointer } from "./dom-helper.js";
-import { createDrag, createTrayDrag, toPileFraction, pixelsToFraction } from "../src/drag.js";
+import { createDrag, createTrayDrag, toPileFraction, pixelsToFraction, pointInRect } from "../src/drag.js";
 
 const BOX = { left: 0, top: 0, width: 400, height: 300 };
 
@@ -477,11 +477,11 @@ test("createTrayDrag resolves a pileEl getter on every pointer event", withDom((
   assert.equal(drops[0][0], "20p");
 }));
 
-import { heightForBox, CUSTOMER_BOX_MM } from "../src/game.js";
+import { heightForBox, CUSTOMER_BOX_COMPACT_MM } from "../src/game.js";
 
 for (const [name, make] of [["a function", (h) => () => h], ["a number", (h) => h]]) {
   test(`createDrag resolves heightMm given as ${name}`, withDom((t, { window, document }) => {
-    const h = heightForBox(CUSTOMER_BOX_MM);
+    const h = heightForBox(CUSTOMER_BOX_COMPACT_MM);
     const { container, calls } = setup(document, { heightMm: make(h) });
     const coin = addCoin(document, container, 1, 120, 120);
     fire(window, coin, "pointerdown", { clientX: 110, clientY: 110 });
@@ -495,7 +495,7 @@ for (const [name, make] of [["a function", (h) => () => h], ["a number", (h) => 
 }
 
 test("createDrag with heightMm moves a group by the fraction for that height", withDom((t, { window, document }) => {
-  const h = heightForBox(CUSTOMER_BOX_MM);
+  const h = heightForBox(CUSTOMER_BOX_COMPACT_MM);
   const { container, calls } = setup(document, { heightMm: () => h, getGroup: () => [1, 2] });
   const a = addCoin(document, container, 1, 120, 120);
   addCoin(document, container, 2, 130, 130);
@@ -508,7 +508,7 @@ test("createDrag with heightMm moves a group by the fraction for that height", w
 
 for (const [name, make] of [["a function", (h) => () => h], ["a number", (h) => h]]) {
   test(`createTrayDrag maps the drop with heightMm given as ${name}`, withDom((t, { window, document }) => {
-    const h = heightForBox(CUSTOMER_BOX_MM);
+    const h = heightForBox(CUSTOMER_BOX_COMPACT_MM);
     const { pileEl, board } = setupTray(document);
     const tray = document.createElement("div");
     const coin = document.createElement("button");
@@ -527,3 +527,219 @@ for (const [name, make] of [["a function", (h) => () => h], ["a number", (h) => 
     assert.ok(Math.abs(want.y - toPileFraction({ x: 300, y: 60 }, BOX).y) > 0.1);
   }));
 }
+
+// Cross-pile drags: the own pile is the usual 400x300 container at the origin, the other a
+// 400x300 box below it at top: 400. dropTarget hit-tests both, as main.js does.
+const OTHER = { left: 0, top: 400, width: 400, height: 300 };
+const OWN_H = 50;
+const OTHER_H = 40;
+
+function setupPiles(document, opts = {}) {
+  const other = document.createElement("div");
+  document.body.append(other);
+  stubRect(other, OTHER);
+  for (const [k, v] of Object.entries({ clientLeft: 0, clientTop: 0, clientWidth: 400, clientHeight: 300 })) {
+    Object.defineProperty(other, k, { value: v });
+  }
+  const transfers = [];
+  const targets = [];
+  let own = null;
+  const piles = () => [{ key: "pile", el: own, heightMm: OWN_H }, { key: "change", el: other, heightMm: OTHER_H }];
+  const ctx = setup(document, {
+    heightMm: OWN_H,
+    dropTarget: (pt) => {
+      targets.push(pt);
+      return piles().find((p) => pointInRect(pt, p.el.getBoundingClientRect())) ?? null;
+    },
+    onTransfer: (...a) => transfers.push(a),
+    ...opts,
+  });
+  own = ctx.container;
+  return { ...ctx, other, transfers, targets };
+}
+
+const ghosts = (document) => document.body.querySelectorAll(".tray-ghost");
+
+test("with a dropTarget a started drag draws body ghosts and dims the source", withDom((t, { window, document }) => {
+  const { container, targets } = setupPiles(document);
+  const coin = addCoin(document, container, 1, 120, 120);
+  coin.innerHTML = "<svg></svg>";
+  coin.classList.add("revealed");
+  fire(window, coin, "pointerdown", { clientX: 110, clientY: 110 });
+  fire(window, coin, "pointermove", { clientX: 210, clientY: 160 });
+  assert.deepEqual(targets[0], { x: 110, y: 110 }); // asked once, with the start point
+  const g = ghosts(document);
+  assert.equal(g.length, 1);
+  assert.equal(g[0].parentElement, document.body);
+  assert.equal(g[0].getAttribute("aria-hidden"), "true");
+  assert.equal(g[0].style.position, "fixed");
+  assert.equal(g[0].style.width, "40px");
+  assert.ok(g[0].querySelector("svg"));
+  assert.ok(g[0].classList.contains("revealed"));
+  // the coin's start centre (120, 120) minus half its size, plus the pointer delta (100, 50)
+  assert.equal(g[0].style.transform, "translate(200px, 150px)");
+  assert.ok(coin.classList.contains("dragging-source"));
+  assert.ok(!coin.classList.contains("dragging"));
+  assert.equal(coin.style.getPropertyValue("--dx"), "");
+}));
+
+test("the other pile gets over-pile while the pointer is over it, the own pile never", withDom((t, { window, document }) => {
+  const { container, other } = setupPiles(document);
+  const coin = addCoin(document, container, 1, 120, 120);
+  fire(window, coin, "pointerdown", { clientX: 120, clientY: 120 });
+  fire(window, coin, "pointermove", { clientX: 200, clientY: 200 });
+  assert.ok(!other.classList.contains("over-pile"));
+  assert.ok(!container.classList.contains("over-pile"));
+  fire(window, coin, "pointermove", { clientX: 200, clientY: 500 });
+  assert.ok(other.classList.contains("over-pile"));
+  assert.ok(!container.classList.contains("over-pile"));
+  fire(window, coin, "pointermove", { clientX: 200, clientY: 200 });
+  assert.ok(!other.classList.contains("over-pile"));
+}));
+
+test("a release over the other pile calls onTransfer with fractions in that pile, not onMove", withDom((t, { window, document }) => {
+  const { container, calls, other, transfers } = setupPiles(document);
+  const coin = addCoin(document, container, 1, 120, 120);
+  fire(window, coin, "pointerdown", { clientX: 110, clientY: 110 });
+  fire(window, coin, "pointermove", { clientX: 210, clientY: 510 });
+  fire(window, coin, "pointerup", { clientX: 210, clientY: 510 });
+  // the coin keeps its grab offset (+10, +10) from the pointer
+  const { x, y } = toPileFraction({ x: 220, y: 520 }, OTHER, OTHER_H);
+  assert.equal(transfers.length, 1);
+  const [uids, leader, key, tx, ty] = transfers[0];
+  assert.deepEqual(uids, [1]);
+  assert.equal(leader, 1);
+  assert.equal(key, "change");
+  assert.ok(Math.abs(tx - x) < 1e-9);
+  assert.ok(Math.abs(ty - y) < 1e-9);
+  assert.equal(calls.move.length, 0);
+  assert.equal(calls.group.length, 0);
+  assert.equal(ghosts(document).length, 0);
+  assert.ok(!coin.classList.contains("dragging-source"));
+  assert.ok(!other.classList.contains("over-pile"));
+}));
+
+test("a group dragged onto the other pile draws two ghosts and transfers both with the leader", withDom((t, { window, document }) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { container, calls, transfers } = setupPiles(document, { holdMs: 50, getGroup: () => [1, 2] });
+  const a = addCoin(document, container, 1, 120, 120);
+  const b = addCoin(document, container, 2, 125, 125);
+  fire(window, a, "pointerdown", { clientX: 120, clientY: 120 });
+  fire(window, a, "pointermove", { clientX: 200, clientY: 500 });
+  assert.equal(ghosts(document).length, 2);
+  for (const m of [a, b]) assert.ok(m.classList.contains("dragging-source"));
+  fire(window, a, "pointerup", { clientX: 200, clientY: 500 });
+  const { x, y } = toPileFraction({ x: 200, y: 500 }, OTHER, OTHER_H);
+  assert.equal(transfers.length, 1);
+  const [uids, leader, key, tx, ty] = transfers[0];
+  assert.deepEqual(uids, [1, 2]);
+  assert.equal(leader, 1);
+  assert.equal(key, "change");
+  assert.ok(Math.abs(tx - x) < 1e-9);
+  assert.ok(Math.abs(ty - y) < 1e-9);
+  assert.equal(calls.group.length, 0);
+  assert.equal(ghosts(document).length, 0);
+  for (const m of [a, b]) assert.ok(!m.classList.contains("dragging-source"));
+}));
+
+test("a held stack member dragged onto the other pile transfers only that coin", withDom((t, { window, document }) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const { container, transfers } = setupPiles(document, { holdMs: 50, getGroup: () => [1, 2] });
+  const a = addCoin(document, container, 1, 120, 120);
+  const b = addCoin(document, container, 2, 125, 125);
+  fire(window, a, "pointerdown", { clientX: 120, clientY: 120 });
+  t.mock.timers.tick(50);
+  fire(window, a, "pointermove", { clientX: 200, clientY: 500 });
+  assert.equal(ghosts(document).length, 1);
+  assert.ok(!b.classList.contains("dragging-source"));
+  fire(window, a, "pointerup", { clientX: 200, clientY: 500 });
+  assert.deepEqual(transfers.map((tr) => [tr[0], tr[1]]), [[[1], 1]]);
+  assert.equal(ghosts(document).length, 0);
+}));
+
+test("a release over the own pile calls onMove, not onTransfer, and removes the ghosts", withDom((t, { window, document }) => {
+  const { container, calls, transfers } = setupPiles(document);
+  const coin = addCoin(document, container, 1, 120, 120);
+  fire(window, coin, "pointerdown", { clientX: 110, clientY: 110 });
+  fire(window, coin, "pointermove", { clientX: 210, clientY: 160 });
+  fire(window, coin, "pointerup", { clientX: 210, clientY: 160 });
+  const { x, y } = toPileFraction({ x: 220, y: 170 }, BOX, OWN_H);
+  assert.equal(transfers.length, 0);
+  assert.equal(calls.move.length, 1);
+  assert.equal(calls.move[0][0], 1);
+  assert.ok(Math.abs(calls.move[0][1] - x) < 1e-9);
+  assert.ok(Math.abs(calls.move[0][2] - y) < 1e-9);
+  assert.equal(ghosts(document).length, 0);
+  assert.ok(!coin.classList.contains("dragging-source"));
+}));
+
+test("a release outside both piles calls nothing and leaves the coin where it was", withDom((t, { window, document }) => {
+  const { container, calls, transfers } = setupPiles(document);
+  const coin = addCoin(document, container, 1, 120, 120);
+  fire(window, coin, "pointerdown", { clientX: 120, clientY: 120 });
+  fire(window, coin, "pointermove", { clientX: 900, clientY: 120 });
+  fire(window, coin, "pointerup", { clientX: 900, clientY: 120 });
+  assert.equal(transfers.length, 0);
+  assert.equal(calls.move.length, 0);
+  assert.equal(calls.group.length, 0);
+  assert.equal(ghosts(document).length, 0);
+  assert.ok(!coin.classList.contains("dragging-source"));
+}));
+
+test("pointercancel mid-drag removes the ghosts, the dimming and over-pile", withDom((t, { window, document }) => {
+  const { container, calls, other, transfers, drag } = setupPiles(document);
+  const coin = addCoin(document, container, 1, 120, 120);
+  fire(window, coin, "pointerdown", { clientX: 120, clientY: 120 });
+  fire(window, coin, "pointermove", { clientX: 200, clientY: 500 });
+  assert.ok(other.classList.contains("over-pile"));
+  fire(window, coin, "pointercancel", {});
+  assert.equal(drag.active(), false);
+  assert.equal(ghosts(document).length, 0);
+  assert.ok(!coin.classList.contains("dragging-source"));
+  assert.ok(!other.classList.contains("over-pile"));
+  fire(window, coin, "pointerup", { clientX: 200, clientY: 500 });
+  assert.equal(transfers.length, 0);
+  assert.equal(calls.move.length, 0);
+}));
+
+test("a lost capture mid-drag removes the ghosts, the dimming and over-pile", withDom((t, { window, document }) => {
+  const { container, other } = setupPiles(document);
+  const coin = addCoin(document, container, 1, 120, 120);
+  fire(window, coin, "pointerdown", { clientX: 120, clientY: 120 });
+  fire(window, coin, "pointermove", { clientX: 200, clientY: 500 });
+  fire(window, coin, "lostpointercapture", {});
+  assert.equal(ghosts(document).length, 0);
+  assert.ok(!coin.classList.contains("dragging-source"));
+  assert.ok(!other.classList.contains("over-pile"));
+}));
+
+test("a game locked mid-drag removes the ghosts, the dimming and over-pile", withDom((t, { window, document }) => {
+  let locked = false;
+  const { container, other } = setupPiles(document, { isLocked: () => locked });
+  const coin = addCoin(document, container, 1, 120, 120);
+  fire(window, coin, "pointerdown", { clientX: 120, clientY: 120 });
+  fire(window, coin, "pointermove", { clientX: 200, clientY: 500 });
+  locked = true;
+  fire(window, coin, "pointermove", { clientX: 210, clientY: 500 });
+  assert.equal(ghosts(document).length, 0);
+  assert.ok(!coin.classList.contains("dragging-source"));
+  assert.ok(!other.classList.contains("over-pile"));
+}));
+
+test("a dropTarget returning null at the start gives a classic drag", withDom((t, { window, document }) => {
+  const transfers = [];
+  const { container, calls } = setup(document, { dropTarget: () => null, onTransfer: (...a) => transfers.push(a) });
+  const coin = addCoin(document, container, 1, 120, 120);
+  fire(window, coin, "pointerdown", { clientX: 110, clientY: 110 });
+  fire(window, coin, "pointermove", { clientX: 210, clientY: 160 });
+  assert.equal(ghosts(document).length, 0);
+  assert.ok(coin.classList.contains("dragging"));
+  assert.ok(!coin.classList.contains("dragging-source"));
+  assert.equal(coin.style.getPropertyValue("--dx"), "100px");
+  fire(window, coin, "pointerup", { clientX: 210, clientY: 160 });
+  const { x, y } = toPileFraction({ x: 220, y: 170 }, BOX);
+  assert.equal(transfers.length, 0);
+  assert.equal(calls.move.length, 1);
+  assert.ok(Math.abs(calls.move[0][1] - x) < 1e-9);
+  assert.ok(Math.abs(calls.move[0][2] - y) < 1e-9);
+}));

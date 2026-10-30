@@ -101,6 +101,8 @@ export function judgeAnswer(scenario, action, changeTotal, due) {
   const ok = { correct: true, hint: "" };
   const bad = (hint) => ({ correct: false, hint });
   if (action === "check") {
+    // an empty Check means "No change"
+    if (changeTotal === 0 && scenario !== "over") return judgeAnswer(scenario, "none", 0, due);
     if (scenario !== "over") return bad("Does this customer need change?");
     if (changeTotal === due) return ok;
     return bad(changeTotal > due ? "Too much change" : "Not enough change");
@@ -115,9 +117,10 @@ export function judgeAnswer(scenario, action, changeTotal, due) {
 export const PILE_WIDTH_MM = 110;
 export const PILE_HEIGHT_MM = 90;
 export const PILE_MARGIN_MM = Math.max(...COINS.map((c) => c.diameter)) / 2;
-export const CUSTOMER_BOX_MM = 40;
-export const CHANGE_BOX_MM = 60;
-// the player's pile on short screens (under 700 px high), so the Give Change screen still fits
+export const CUSTOMER_BOX_MM = 50;
+export const CHANGE_BOX_MM = 50;
+// both piles shrink on short screens (under 700 px high), so the Give Change screen still fits
+export const CUSTOMER_BOX_COMPACT_MM = 40;
 export const CHANGE_BOX_COMPACT_MM = 40;
 
 // Play-area height for a pile box of the given edge length.

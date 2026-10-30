@@ -30,6 +30,12 @@ test("renderPile labels buttons \"Remove 20p\" when removable", withDom((t, { do
   assert.equal(c.children[0].getAttribute("aria-label"), "Remove 20p");
 }));
 
+test("renderPile labels a customer coin \"20p coin\" even in a removable pile", withDom((t, { document }) => {
+  const c = document.createElement("div");
+  renderPile(c, [{ ...entry(1, "20p"), customer: true }, entry(2, "20p", 80, 80)], null, true);
+  assert.deepEqual([...c.children].map((b) => b.getAttribute("aria-label")), ["20p coin", "Remove 20p"]);
+}));
+
 test("renderPile keeps the same button for an unchanged uid and coin", withDom((t, { document }) => {
   const c = document.createElement("div");
   renderPile(c, [entry(1, "20p")]);

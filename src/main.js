@@ -9,7 +9,7 @@ import { announce, renderPile, renderTray, setText, showStackBadges } from "./re
 import {
   addToPile, canAdvance, clearPile, createState, isContinuous, nextGiveChangeCustomer, nextCustomer, nextRound, startCashier, startGiveChange, submitAnswer,
   addToPileAt, moveCoin, moveGroup, removeFromPile, settleCoin, settleGroupCoins, setOption, selectMode,
-  pileHeightMm, startGame, submitCheck, submitGiveChangeAnswer,
+  pileHeightMm, startGame, submitCheck, submitGiveChangeAnswer, transferCoins, sendCoin,
 } from "./state.js";
 
 const $ = (id) => document.getElementById(id);
@@ -24,7 +24,8 @@ const PILE_IDS = { pile: "play-pile", change: "change-pile" };
 const pileEl = (key) => $(PILE_IDS[key]);
 // tray adds, tray drops and Clear go to the change in Give Change mode, else to the pile
 const activeKey = () => (state.mode === "give-change" ? "change" : "pile");
-// Short screens (an iPhone SE, a landscape phone) give the player's Change pile the 4 cm box so the screen fits.
+// Short screens (an iPhone SE, a landscape phone) shrink the piles to the 4 cm box so the screen fits
+// (the player's pile, or both Give Change piles).
 const compactQuery = window.matchMedia("(max-height: 700px)");
 const heightOf = (key) => pileHeightMm(state, key, compactQuery.matches);
 // the held, detached coin per pile: it does not count toward stack badges
@@ -102,8 +103,9 @@ function watchDwell(container, key) {
     const id = coin.dataset.uid ?? coin.dataset.coin;
     swallow = { id, container };
     setTimeout(() => { if (swallow?.id === id) swallow = null; }, 500);
-    if (key) removeCoin(id, key);
-    else addCoin(id);
+    // a coin that sends on tap is only read by a hold: the release (and the click after it) does nothing
+    if (!key) addCoin(id);
+    else if (!sendsOnTap(key, id)) removeCoin(id, key);
   });
 }
 
@@ -274,6 +276,42 @@ function moveGroupAndRefocus(uids, dx, dy, leaderUid, key) {
   if (focusedUid !== null) container.querySelector(`[data-uid="${focusedUid}"]`)?.focus({ preventScroll: true });
 }
 
+// Give Change: the pile container under a viewport point, so a drag can drop on the other pile
+function dropTarget(pt) {
+  if (state.mode !== "give-change") return null;
+  // elementFromPoint respects the clipping of the scrolling .content, unlike a rectangle test
+  const hit = document.elementFromPoint(pt.x, pt.y)?.closest(".pile");
+  if (!hit) return null;
+  for (const key of ["pile", "change"]) {
+    if (pileEl(key) === hit) return { key, el: hit, heightMm: heightOf(key) };
+  }
+  return null;
+}
+
+function applyTransfer(next, from, to) {
+  const hadFocus = focusedUidIn(from) !== null;
+  const before = state;
+  update(next);
+  // the moved coins get new uids and the leader is appended last, so follow it into the target pile
+  if (hadFocus && state[to] !== before[to]) pileEl(to).lastElementChild?.focus({ preventScroll: true });
+}
+
+function transferAndRefocus(uids, leaderUid, from, to, x, y) {
+  applyTransfer(transferCoins(state, uids, leaderUid, from, to, x, y, compactQuery.matches), from, to);
+}
+
+// In Give Change a tap sends a customer coin (or any coin in the customer pile) to the other pile
+const sendsOnTap = (key, uidText) => state.mode === "give-change"
+  && (key === "pile" || !!state[key].find((e) => e.uid === Number(uidText))?.customer);
+
+function tapCoin(uidText, key) {
+  if (sendsOnTap(key, uidText)) {
+    const next = sendCoin(state, Number(uidText), key, Math.random, compactQuery.matches);
+    if (next !== state) { applyTransfer(next, key, key === "pile" ? "change" : "pile"); return; }
+  }
+  removeCoin(uidText, key);
+}
+
 function onDragStart(el) {
   if (!el.classList.contains("revealed")) dwell.stop(el);
 }
@@ -323,11 +361,13 @@ function wirePile(key) {
       const { x, y } = detachNudge(entry, heightOf(key));
       moveAndRefocus(uid, x, y, key);
     },
+    dropTarget,
+    onTransfer: (uids, leaderUid, to, x, y) => transferAndRefocus(uids, leaderUid, key, to, x, y),
   });
   watchDwell(container, key);
   container.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-uid]");
-    if (btn && !takeSwallow(container, btn.dataset.uid)) removeCoin(btn.dataset.uid, key);
+    if (btn && !takeSwallow(container, btn.dataset.uid)) tapCoin(btn.dataset.uid, key);
   });
   container.addEventListener("keydown", (e) => {
     const dir = ARROWS[e.key];
@@ -343,8 +383,10 @@ function wirePile(key) {
 }
 wirePile("pile");
 wirePile("change");
-// crossing 700 px high changes the player's box: redraw it (coins keep their fractional, clamped places)
+// crossing 700 px high changes the pile boxes (the player's pile, or both in Give Change): redraw them
+// (coins keep their fractional, clamped places)
 compactQuery.addEventListener?.("change", () => {
+  shownPile = undefined;
   shownChange = undefined;
   render();
 });

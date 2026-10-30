@@ -1,7 +1,7 @@
 import { COINS } from "./coins.js";
 import { MODE_IDS, defaultOptions, isOptionId } from "./options.js";
 import {
-  CHANGE_BOX_COMPACT_MM, CHANGE_BOX_MM, CUSTOMER_BOX_MM, PILE_HEIGHT_MM, changeDue, check, checkAnswer, clampPosition, formatPence,
+  CHANGE_BOX_COMPACT_MM, CHANGE_BOX_MM, CUSTOMER_BOX_COMPACT_MM, CUSTOMER_BOX_MM, PILE_HEIGHT_MM, changeDue, check, checkAnswer, clampPosition, formatPence,
   heightForBox, judgeAnswer, placeCoin, placeHandfulCoin, priceFor, randomHandful, rollScenario, settlePile,
   settleGroup, total,
 } from "./game.js";
@@ -14,7 +14,7 @@ export function createState() {
   return {
     mode: "endless", target: 0, pile: [], nextUid: 1, rounds: 0, solved: false, solvedAt: 0,
     message: NO_MESSAGE, options: defaultOptions(),
-    change: [], price: 0, scenario: "",
+    change: [], price: 0, scenario: "", paid: 0, dealt: [],
   };
 }
 
@@ -38,10 +38,10 @@ export function nextRound(state, target) {
 }
 
 // Play-area height of a pile: Give Change mode gives the customer's and the player's piles short boxes.
-// `compact` (a short screen, from the UI) shrinks the player's pile to the customer's 4 cm box.
+// `compact` (a short screen, from the UI) shrinks both piles to 4 cm boxes.
 export function pileHeightMm(state, key = "pile", compact = false) {
   if (state.mode !== "give-change") return PILE_HEIGHT_MM;
-  if (key !== "change") return heightForBox(CUSTOMER_BOX_MM);
+  if (key !== "change") return heightForBox(compact ? CUSTOMER_BOX_COMPACT_MM : CUSTOMER_BOX_MM);
   return heightForBox(compact ? CHANGE_BOX_COMPACT_MM : CHANGE_BOX_MM);
 }
 
@@ -67,10 +67,12 @@ export function startCashier(state, rng = Math.random) {
   return dealHandful(fresh, randomHandful(rng), rng);
 }
 
+// The dealt coins are the customer's: they stay flagged wherever they are moved, and can never be removed.
 function setScenario(state, odds, rng) {
-  const paid = total(state.pile);
+  const pile = state.pile.map((e) => ({ ...e, customer: true }));
+  const paid = total(pile);
   const scenario = rollScenario(odds, rng, paid);
-  return { ...state, scenario, price: priceFor(paid, scenario, rng) };
+  return { ...state, pile, scenario, price: priceFor(paid, scenario, rng), paid, dealt: pile };
 }
 
 export function startGiveChange(state, odds, rng = Math.random) {
@@ -79,7 +81,7 @@ export function startGiveChange(state, odds, rng = Math.random) {
 }
 
 export function nextGiveChangeCustomer(state, odds, rng = Math.random) {
-  const previous = state.pile.map((e) => e.coinId);
+  const previous = state.dealt.map((e) => e.coinId);
   const fresh = { ...createState(), mode: "give-change", rounds: state.rounds, options: state.options };
   return setScenario(dealHandful(fresh, randomHandful(rng, previous), rng), odds, rng);
 }
@@ -90,9 +92,11 @@ function successText(scenario, due, shortBy) {
   return `Correct! They are ${formatPence(shortBy)} short.`;
 }
 
+// Judging uses the amount paid when the round was dealt, not the customer pile as shown:
+// coins moved between the piles never change the scenario or the change due.
 export function submitGiveChangeAnswer(state, action, now) {
   if (state.solved) return state;
-  const due = changeDue(total(state.pile), state.price);
+  const due = changeDue(state.paid, state.price);
   const result = judgeAnswer(state.scenario, action, total(state.change), due);
   if (result.correct) {
     return {
@@ -100,14 +104,14 @@ export function submitGiveChangeAnswer(state, action, now) {
       solved: true,
       solvedAt: now,
       rounds: state.rounds + 1,
-      message: { text: successText(state.scenario, due, state.price - total(state.pile)), kind: "success" },
+      message: { text: successText(state.scenario, due, state.price - state.paid), kind: "success" },
     };
   }
   return { ...state, message: { text: result.hint, kind: "hint" } };
 }
 
 export function nextCustomer(state, rng = Math.random) {
-  const previous = state.pile.map((e) => e.coinId);
+  const previous = state.pile.map((e) => e.coinId); // Cashier's pile is read-only, and `dealt` is only set in Give Change
   return dealHandful(
     { ...createState(), mode: state.mode, rounds: state.rounds, options: state.options },
     randomHandful(rng, previous),
@@ -147,7 +151,8 @@ export function addToPileAt(state, coinId, x, y, rng = Math.random, key = "pile"
 }
 
 export function removeFromPile(state, uid, key = "pile") {
-  if (locked(state, key) || !state[key].some((e) => e.uid === uid)) return state;
+  const entry = state[key].find((e) => e.uid === uid);
+  if (locked(state, key) || !entry || entry.customer) return state;
   return { ...state, [key]: state[key].filter((e) => e.uid !== uid), message: NO_MESSAGE };
 }
 
@@ -191,7 +196,55 @@ export function settleGroupCoins(state, uids, leaderUid, from, key = "pile", com
 
 export function clearPile(state, key = "pile") {
   if (locked(state, key)) return state;
+  // Give Change: Clear also puts the customer's coins back where they were dealt.
+  if (state.mode === "give-change" && key === "change") {
+    return { ...state, pile: state.dealt, change: [], message: NO_MESSAGE };
+  }
   return { ...state, [key]: [], message: NO_MESSAGE };
+}
+
+const PILE_KEYS = ["pile", "change"];
+const OVERPAID_HINT = { text: "That is more than they paid. Press Clear to start again.", kind: "hint" };
+
+// Give Change: moves coins between the customer's pile and the change pile. The leader lands at
+// (x, y) and the others keep their offset from it; the moved coins get new uids, leader last.
+export function transferCoins(state, uids, leaderUid, from, to, x, y, compact = false) {
+  if (state.mode !== "give-change" || state.solved || from === to) return state;
+  if (!PILE_KEYS.includes(from) || !PILE_KEYS.includes(to)) return state;
+  const leader = state[from].find((e) => e.uid === leaderUid);
+  if (!leader) return state;
+  const wanted = new Set(uids);
+  wanted.add(leaderUid);
+  const group = state[from].filter((e) => wanted.has(e.uid) && e !== leader);
+  group.push(leader);
+  if (to === "pile" && total(state.pile) + total(group) > state.paid) {
+    return { ...state, message: { ...OVERPAID_HINT } };
+  }
+  const at = clampPosition(x, y);
+  const moved = group.map((e, i) => ({
+    ...e, uid: state.nextUid + i, x: at.x + e.x - leader.x, y: at.y + e.y - leader.y,
+  }));
+  const newUids = moved.map((e) => e.uid);
+  const list = settleGroup([...state[to], ...moved], newUids, newUids.at(-1), null, pileHeightMm(state, to, compact));
+  return {
+    ...state,
+    [from]: state[from].filter((e) => !wanted.has(e.uid)),
+    [to]: list,
+    nextUid: state.nextUid + moved.length,
+    message: NO_MESSAGE,
+  };
+}
+
+// Give Change: a tap sends a coin to the other pile, so a handful need not be dragged coin by coin.
+// A customer coin in the change pile goes back; one of your own coins there is left for the caller to remove.
+export function sendCoin(state, uid, from, rng = Math.random, compact = false) {
+  if (!PILE_KEYS.includes(from)) return state;
+  const entry = state[from].find((e) => e.uid === uid);
+  if (!entry || (from === "change" && !entry.customer)) return state;
+  const to = from === "pile" ? "change" : "pile";
+  const coin = COINS.find((c) => c.id === entry.coinId);
+  const { x, y } = placeCoin(state[to], coin, rng, pileHeightMm(state, to, compact));
+  return transferCoins(state, [uid], uid, from, to, x, y, compact);
 }
 
 export function submitCheck(state, now) {
