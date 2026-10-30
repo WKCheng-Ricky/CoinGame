@@ -23,8 +23,7 @@ export function timingFromSearch(search) {
   };
 }
 
-// Give Change mode odds per difficulty. `underpaid` is the chance a customer underpays; tune it here.
-export const GIVE_CHANGE_ODDS = {
-  normal: { underpaid: 0.25, exactShare: 1 / 3 },
-  easy: { underpaid: 0, exactShare: 1 / 3 },
-};
+// Give Change mode odds. `underpaid` is the chance a customer underpays (only with the shortPay option); tune it here.
+export function giveChangeOdds(options) {
+  return { underpaid: options.shortPay ? 0.25 : 0, exactShare: 1 / 3 };
+}

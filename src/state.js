@@ -1,4 +1,5 @@
 import { COINS } from "./coins.js";
+import { MODE_IDS, defaultOptions, isOptionId } from "./options.js";
 import {
   CHANGE_BOX_COMPACT_MM, CHANGE_BOX_MM, CUSTOMER_BOX_MM, PILE_HEIGHT_MM, changeDue, check, checkAnswer, clampPosition, formatPence,
   heightForBox, judgeAnswer, placeCoin, placeHandfulCoin, priceFor, randomHandful, rollScenario, settlePile,
@@ -12,22 +13,28 @@ const NO_MESSAGE = { text: "", kind: "" };
 export function createState() {
   return {
     mode: "endless", target: 0, pile: [], nextUid: 1, rounds: 0, solved: false, solvedAt: 0,
-    message: NO_MESSAGE, difficulty: "normal",
+    message: NO_MESSAGE, options: defaultOptions(),
     change: [], price: 0, scenario: "",
   };
 }
 
-export function setDifficulty(state, difficulty) {
-  if (difficulty !== "easy" && difficulty !== "normal") return state;
-  return { ...state, difficulty };
+export function setOption(state, id, value) {
+  if (!isOptionId(id) || typeof value !== "boolean") return state;
+  return { ...state, options: { ...state.options, [id]: value } };
+}
+
+// The home screen's selected mode; a game start sets it again.
+export function selectMode(state, mode) {
+  if (!MODE_IDS.includes(mode)) return state;
+  return { ...state, mode };
 }
 
 export function startGame(state, mode, target) {
-  return { ...createState(), mode, target, difficulty: state.difficulty };
+  return { ...createState(), mode, target, options: state.options };
 }
 
 export function nextRound(state, target) {
-  return { ...createState(), mode: state.mode, rounds: state.rounds, target, difficulty: state.difficulty };
+  return { ...createState(), mode: state.mode, rounds: state.rounds, target, options: state.options };
 }
 
 // Play-area height of a pile: Give Change mode gives the customer's and the player's piles short boxes.
@@ -56,7 +63,7 @@ function dealHandful(state, ids, rng) {
 }
 
 export function startCashier(state, rng = Math.random) {
-  const fresh = { ...createState(), mode: "cashier", difficulty: state.difficulty };
+  const fresh = { ...createState(), mode: "cashier", options: state.options };
   return dealHandful(fresh, randomHandful(rng), rng);
 }
 
@@ -67,13 +74,13 @@ function setScenario(state, odds, rng) {
 }
 
 export function startGiveChange(state, odds, rng = Math.random) {
-  const fresh = { ...createState(), mode: "give-change", difficulty: state.difficulty };
+  const fresh = { ...createState(), mode: "give-change", options: state.options };
   return setScenario(dealHandful(fresh, randomHandful(rng), rng), odds, rng);
 }
 
 export function nextGiveChangeCustomer(state, odds, rng = Math.random) {
   const previous = state.pile.map((e) => e.coinId);
-  const fresh = { ...createState(), mode: "give-change", rounds: state.rounds, difficulty: state.difficulty };
+  const fresh = { ...createState(), mode: "give-change", rounds: state.rounds, options: state.options };
   return setScenario(dealHandful(fresh, randomHandful(rng, previous), rng), odds, rng);
 }
 
@@ -102,7 +109,7 @@ export function submitGiveChangeAnswer(state, action, now) {
 export function nextCustomer(state, rng = Math.random) {
   const previous = state.pile.map((e) => e.coinId);
   return dealHandful(
-    { ...createState(), mode: state.mode, rounds: state.rounds, difficulty: state.difficulty },
+    { ...createState(), mode: state.mode, rounds: state.rounds, options: state.options },
     randomHandful(rng, previous),
     rng,
   );

@@ -1,13 +1,14 @@
 import { describePile, detachNudge, formatPence, parseAmount, randomTarget, total, unitUids } from "./game.js";
 import { createDwell } from "./dwell.js";
-import { GIVE_CHANGE_ODDS, timingFromSearch } from "./config.js";
+import { giveChangeOdds, timingFromSearch } from "./config.js";
+import { mountHome } from "./home.js";
 import { createDrag, createTrayDrag } from "./drag.js";
 import { isCheckShortcut } from "./keys.js";
 import { applyTheme, getStorage, nextTheme, readTheme, saveTheme, themeLabel } from "./theme.js";
 import { announce, renderPile, renderTray, setText, showStackBadges } from "./render.js";
 import {
   addToPile, canAdvance, clearPile, createState, isContinuous, nextGiveChangeCustomer, nextCustomer, nextRound, startCashier, startGiveChange, submitAnswer,
-  addToPileAt, moveCoin, moveGroup, removeFromPile, settleCoin, settleGroupCoins, setDifficulty,
+  addToPileAt, moveCoin, moveGroup, removeFromPile, settleCoin, settleGroupCoins, setOption, selectMode,
   pileHeightMm, startGame, submitCheck, submitGiveChangeAnswer,
 } from "./state.js";
 
@@ -56,10 +57,6 @@ function initTheme() {
   window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", syncThemeColor);
 }
 initTheme();
-
-// iOS Safari only applies :active (the pressed fill on the mode buttons) when a touch
-// listener exists on the element or an ancestor. This one is a deliberate no-op.
-document.querySelector(".stack-col")?.addEventListener("touchstart", () => {}, { passive: true });
 
 const timing = timingFromSearch(location.search);
 
@@ -179,18 +176,19 @@ function render() {
     dwell.prune((el) => el.isConnected);
   }
   const screen = $("screen-play");
-  screen.dataset.difficulty = state.difficulty;
-  // the tray drag ghost lives in <body> (drag.js), so mirror the difficulty there for the label rules
-  document.body.dataset.difficulty = state.difficulty;
+  const showCoins = state.options.showCoins;
+  screen.dataset.showCoins = String(showCoins);
+  // the tray drag ghost lives in <body> (drag.js), so mirror Show Coins there for the label rules
+  document.body.dataset.showCoins = String(showCoins);
   setText($("play-total"), fixedPile ? "" : `Your total: ${formatPence(total(state.pile))}`);
-  // in Normal a visible total would give away the hidden coin values
-  $("play-total").hidden = fixedPile || state.difficulty !== "easy";
+  // with Show Coins off a visible total would give away the hidden coin values
+  $("play-total").hidden = fixedPile || !showCoins;
   $("change-area").hidden = !giveChange;
   setText($("change-total"), giveChange ? `Your change: ${formatPence(total(state.change))}` : "");
-  $("change-total").hidden = !giveChange || state.difficulty !== "easy";
+  $("change-total").hidden = !giveChange || !showCoins;
   // the answer buttons stay in place after a solve (so nothing shifts) but are disabled until the next customer
   $("btn-none").hidden = !giveChange;
-  $("btn-short").hidden = !giveChange || state.difficulty === "easy";
+  $("btn-short").hidden = !giveChange || !state.options.shortPay;
   $("btn-none").disabled = state.solved;
   $("btn-short").disabled = state.solved;
   $("play-tray").hidden = cashier;
@@ -218,6 +216,7 @@ function render() {
     if (state.solved) btn.setAttribute("aria-disabled", "true");
     else btn.removeAttribute("aria-disabled");
   }
+  home.update(state.mode, state.options);
 }
 
 function update(next) {
@@ -350,13 +349,10 @@ compactQuery.addEventListener?.("change", () => {
   render();
 });
 
-document.querySelector(".difficulty").addEventListener("change", (e) => {
-  update(setDifficulty(state, e.target.value));
-});
-
-// Hold, hover or focus a difficulty label to read what it means, without choosing it.
-function watchDifficultyNotes(fieldset) {
-  const note = $("difficulty-note");
+// Hold, hover or focus an option label to read what it means, without toggling it.
+// Returns the dwell so a rebuilt list can drop its pending reveals.
+function watchOptionNotes(fieldset) {
+  const note = $("option-note");
   let touching = false; // a non-mouse press is down
   let heldReveal = false; // that press revealed a note, so its click must not select
   const notes = createDwell({
@@ -397,8 +393,9 @@ function watchDifficultyNotes(fieldset) {
     heldReveal = false;
     if (labelOf(e)) e.preventDefault();
   });
+  return notes;
 }
-watchDifficultyNotes(document.querySelector(".difficulty"));
+const optionNotes = watchOptionNotes($("options"));
 
 $("play-tray").addEventListener("click", (e) => {
   const btn = e.target.closest("[data-coin]");
@@ -465,7 +462,7 @@ $("btn-next").addEventListener("click", () => {
     resetCashierInput();
   } else if (state.mode === "give-change") {
     resetPileDom();
-    beginRound(nextGiveChangeCustomer(state, GIVE_CHANGE_ODDS[state.difficulty]));
+    beginRound(nextGiveChangeCustomer(state, giveChangeOdds(state.options)));
   } else {
     beginRound(nextRound(state, randomTarget(state.target)));
   }
@@ -473,21 +470,20 @@ $("btn-next").addEventListener("click", () => {
 $("btn-again").addEventListener("click", () => {
   if (canAdvance(state, performance.now(), timing.advanceDelayMs)) beginRound(nextRound(state, state.target));
 });
-$("btn-cashier").addEventListener("click", () => {
-  resetPileDom();
-  update(startCashier(state));
-  resetCashierInput();
+function startSelected(mode) {
+  if (mode === "custom") { openCustom(""); return; }
+  if (mode === "endless") {
+    update(startGame(state, "endless", randomTarget()));
+  } else if (mode === "cashier") {
+    resetPileDom();
+    update(startCashier(state));
+    resetCashierInput();
+  } else {
+    resetPileDom();
+    update(startGiveChange(state, giveChangeOdds(state.options)));
+  }
   showScreen("play");
-});
-$("btn-give-change").addEventListener("click", () => {
-  resetPileDom();
-  update(startGiveChange(state, GIVE_CHANGE_ODDS[state.difficulty]));
-  showScreen("play");
-});
-$("btn-endless").addEventListener("click", () => {
-  update(startGame(state, "endless", randomTarget()));
-  showScreen("play");
-});
+}
 
 function openCustom(prefill) {
   const input = $("custom-input");
@@ -498,7 +494,6 @@ function openCustom(prefill) {
   input.focus();
 }
 
-$("btn-custom").addEventListener("click", () => openCustom(""));
 $("btn-change").addEventListener("click", () => openCustom(formatPence(state.target).slice(1)));
 $("custom-form").addEventListener("submit", (e) => {
   e.preventDefault();
@@ -515,3 +510,13 @@ $("custom-form").addEventListener("submit", (e) => {
 });
 $("custom-back").addEventListener("click", () => showScreen("home"));
 $("btn-back").addEventListener("click", () => showScreen("home"));
+
+const home = mountHome(
+  { modes: $("modes"), options: $("options"), play: $("btn-play") },
+  {
+    onMode: (mode) => { optionNotes.cancelAll(); update(selectMode(state, mode)); },
+    onOption: (id, value) => update(setOption(state, id, value)),
+    onPlay: startSelected,
+  },
+);
+home.update(state.mode, state.options);

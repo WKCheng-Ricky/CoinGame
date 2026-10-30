@@ -251,7 +251,7 @@ export function createTrayDrag(container, { onDrop, onDragStart, isLocked, pileE
       ghost.style.height = `${size}px`;
       const svg = t.el.querySelector("svg");
       if (svg) ghost.append(svg.cloneNode(true));
-      // inside .board so the difficulty rules hide the label; mirror the revealed state
+      // inside .board so the Show Coins rules hide the label; mirror the revealed state
       if (t.el.classList.contains("revealed")) ghost.classList.add("revealed");
       (t.el.closest(".board") ?? document.body).append(ghost);
       t.ghost = ghost;

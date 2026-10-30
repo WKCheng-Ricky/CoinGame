@@ -21,23 +21,12 @@
       </button>
       <h1 tabindex="-1">Coin Game</h1>
       <p>Make the amount using UK coins.</p>
-      <fieldset class="choice difficulty">
-        <legend>Difficulty</legend>
-        <label title="Read the coins yourself" aria-describedby="diff-normal-help"><input type="radio" name="difficulty" id="diff-normal" value="normal" checked autocomplete="off" aria-describedby="diff-normal-help"> Normal</label>
-        <label title="Values always shown" aria-describedby="diff-easy-help"><input type="radio" name="difficulty" id="diff-easy" value="easy" autocomplete="off" aria-describedby="diff-easy-help"> Easy</label>
-        <span class="sr-only" id="diff-normal-help">Read the coins yourself</span>
-        <span class="sr-only" id="diff-easy-help">Values always shown</span>
-      </fieldset>
-      <p id="difficulty-note" class="choice-note" aria-live="polite"></p>
-      <fieldset class="choice">
-        <legend>Choose a game</legend>
-        <div class="stack-col">
-          <button id="btn-endless">Endless</button>
-          <button id="btn-custom">Custom</button>
-          <button id="btn-cashier">Cashier</button>
-          <button id="btn-give-change">Give Change</button>
-        </div>
-      </fieldset>
+      <h2 id="modes-heading" class="sec">Game</h2>
+      <div id="modes" class="modes" role="radiogroup" aria-labelledby="modes-heading"></div>
+      <h2 class="sec">Options</h2>
+      <div id="options" class="choice options"></div>
+      <p id="option-note" class="choice-note" aria-live="polite"></p>
+      <button id="btn-play" class="primary play" type="button">Play</button>
     </section>
 
     <section id="screen-custom" hidden>
@@ -53,7 +42,7 @@
       </form>
     </section>
 
-    <section id="screen-play" data-difficulty="normal" hidden>
+    <section id="screen-play" data-show-coins="false" hidden>
       <header class="topbar">
         <button id="btn-back">&lsaquo; Back</button>
         <div class="topbar-info">
