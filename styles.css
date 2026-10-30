@@ -143,6 +143,9 @@ label { display: block; margin: 0.5rem 0 0.25rem; }
 .label { color: var(--muted); font-size: 0.9rem; font-weight: 400; }
 .target { margin: 0; font-size: clamp(1.2rem, 5vw, 1.75rem); font-weight: 800; line-height: 1.2; text-align: center; }
 [tabindex="-1"]:focus { outline: none; }
+.countdown { width: 100%; max-width: 12rem; height: 0.4rem; margin-top: 0.2rem; border-radius: 0.2rem; background: var(--line); overflow: hidden; }
+.countdown-bar { width: 100%; height: 100%; background: var(--accent); }
+.countdown-bar[data-low="true"] { background: var(--bad); }
 .rounds { margin: 0; text-align: center; color: var(--muted); font-size: 0.9rem; line-height: 1.2; }
 
 .content { position: relative; display: flex; flex-direction: column; flex: 1; min-height: 3rem; overflow-y: auto; }
@@ -279,6 +282,16 @@ label { display: block; margin: 0.5rem 0 0.25rem; }
 .mode small { display: block; color: var(--muted); font-size: 0.85rem; }
 .options label { display: flex; align-items: center; gap: 0.6rem; min-height: 44px; margin: 0; padding-inline: 0.4rem; text-align: left; }
 .options input { width: 1.2rem; height: 1.2rem; flex: none; }
+.options label { flex-wrap: wrap; }
+.opt-text { flex: 1 1 auto; min-width: 0; }
+.badge { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0 0.45rem; border: 1.5px solid currentColor; border-radius: 1rem; font-size: 0.8rem; line-height: 1.4; }
+.badge-easier { color: var(--good); }
+.badge-harder { color: var(--bad); }
+.badge-neutral { color: var(--muted); }
+.opt-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; min-height: 44px; padding-inline: 0.4rem; text-align: left; }
+.radios { display: flex; flex-wrap: wrap; gap: 0.2rem 0.4rem; padding-inline: 0.4rem; }
+.radios label { padding-inline: 0.2rem; min-width: 4.5rem; }
+.why { display: block; margin: -0.3rem 0 0.3rem 2.2rem; color: var(--muted); font-size: 0.85rem; text-align: left; }
 h2.sec { width: 100%; max-width: 18.5rem; margin: 0.9rem auto 0.3rem; text-align: left; }
 .play { width: 100%; max-width: 18.5rem; margin: 0.5rem auto 1rem; }
 

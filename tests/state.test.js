@@ -6,9 +6,9 @@ import {
   addToPile, removeFromPile, clearPile, submitCheck, canAdvance,
   setOption, selectMode, moveCoin, settleCoin, addToPileAt, moveGroup, settleGroupCoins,
   startCashier, nextCustomer, submitAnswer, isContinuous,
-  startGiveChange, nextGiveChangeCustomer, submitGiveChangeAnswer, transferCoins, sendCoin,
+  startGiveChange, nextGiveChangeCustomer, submitGiveChangeAnswer, transferCoins, sendCoin, expireRound,
 } from "../src/state.js";
-import { formatPence, randomHandful, stackCounts, total, PUSH_FACTOR, PILE_WIDTH_MM, PILE_HEIGHT_MM, STACK_STEP_MM, detachNudge } from "../src/game.js";
+import { formatPence, layoutStacks, randomHandful, stackCounts, total, PUSH_FACTOR, PILE_WIDTH_MM, PILE_HEIGHT_MM, STACK_STEP_MM, detachNudge } from "../src/game.js";
 import { coinById } from "../src/coins.js";
 
 const EXACT_395 = pileOf("£2", "£1", "50p", "20p", "20p", "5p");
@@ -22,9 +22,10 @@ const SPREAD = { ...createState(), target: 395, pile: [A, B, C], nextUid: 4 };
 
 test("createState has the expected shape", () => {
   assert.deepEqual(createState(), {
-    mode: "endless", target: 0, pile: [], nextUid: 1, rounds: 0, solved: false, solvedAt: 0,
+    mode: "endless", target: 0, pile: [], nextUid: 1, rounds: 0, solved: false, solvedAt: 0, unserved: false,
+    roundStartedAt: 0, score: 0, lastPoints: 0,
     message: { text: "", kind: "" },
-    options: { showCoins: false, largeCoins: false, shortPay: true },
+    options: { showCoins: false, largeCoins: false, autoStack: true, shortPay: true, timerScore: false, timeLimit: 0 },
     change: [], price: 0, scenario: "", paid: 0, dealt: [],
   });
   assert.equal(ADVANCE_DELAY_MS, 400);
@@ -713,11 +714,14 @@ test("pileHeightMm gives the short customer and change heights in Give Change on
   }
 });
 
+// the old scatter deal, replayed by dealAt
+const OLD_DEAL = setOption(createState(), "autoStack", false);
+
 test("startGiveChange deals the customer's coins into the short play area", () => {
   let apart = 0;
   let full = 0;
   for (let seed = 1; seed <= 200; seed++) {
-    const s = startGiveChange(createState(), NORMAL, seeded(seed));
+    const s = startGiveChange(OLD_DEAL, NORMAL, seeded(seed));
     if (s.pile.length === 12) full++;
     for (const e of s.pile) assert.ok(Math.abs(e.y) * CUSTOMER_H <= CUSTOMER_H / 2 + 1e-9);
     assert.deepEqual(s.pile.map(({ customer, ...e }) => e), dealAt(seed, CUSTOMER_H)); // the flag is not part of the deal
@@ -729,9 +733,9 @@ test("startGiveChange deals the customer's coins into the short play area", () =
 
 test("startCashier and nextCustomer still deal at the 90 mm height", () => {
   for (let seed = 1; seed <= 20; seed++) {
-    assert.deepEqual(startCashier(createState(), seeded(seed)).pile, dealAt(seed, PILE_HEIGHT_MM));
+    assert.deepEqual(startCashier(OLD_DEAL, seeded(seed)).pile, dealAt(seed, PILE_HEIGHT_MM));
   }
-  const first = startCashier(createState(), seeded(4));
+  const first = startCashier(OLD_DEAL, seeded(4));
   const next = nextCustomer(first, seeded(9));
   for (const e of next.pile) assert.ok(Math.abs(e.y) <= 0.5);
   assert.ok(differentCoinsApart(next.pile, PILE_HEIGHT_MM));
@@ -1043,4 +1047,209 @@ test("pileHeightMm follows the coin scale: the box stays the same size, the play
   } finally {
     setCoinScale(1);
   }
+});
+
+const ODDS = { underpaid: 0.25, exactShare: 1 / 3 };
+const OFF = (s) => setOption(s, "autoStack", false);
+
+test("startCashier with Auto-stack on deals one stack per denomination", () => {
+  for (let seed = 1; seed <= 30; seed++) {
+    const s = startCashier(createState(), seeded(seed));
+    const ids = new Set(s.pile.map((e) => e.coinId));
+    const counts = stackCounts(s.pile);
+    const repeated = [...ids].filter((id) => s.pile.filter((e) => e.coinId === id).length > 1);
+    assert.equal(counts.size, repeated.length, `seed ${seed}`);
+  }
+});
+
+test("startGiveChange with Auto-stack on stacks the dealt coins and keeps them as dealt", () => {
+  const s = startGiveChange(createState(), ODDS, seeded(7));
+  assert.deepEqual(s.dealt, s.pile);
+  assert.ok(s.pile.every((e) => e.customer));
+  assert.equal(s.nextUid, s.pile.length + 1);
+});
+
+test("with Auto-stack off, startCashier deals exactly what the old scatter dealt for the same seed", () => {
+  const ids = randomHandful(seeded(11));
+  const rng = seeded(11);
+  randomHandful(rng); // the handful draw
+  const expected = ids.reduce((pile, id, i) => {
+    const coin = coinById(id);
+    return [...pile, { uid: i + 1, coinId: id, ...placeHandfulCoin(pile, coin, rng) }];
+  }, []);
+  const s = startCashier(OFF(createState()), seeded(11));
+  assert.deepEqual(s.pile.map((e) => e.coinId), expected.map((e) => e.coinId));
+});
+
+test("Clear in Give Change restores the stacked layout", () => {
+  const s = startGiveChange(createState(), ODDS, seeded(5));
+  const moved = { ...s, change: [{ uid: 99, coinId: "1p", x: 0, y: 0, rot: 0 }] };
+  assert.deepEqual(clearPile(moved, "change").pile, s.dealt);
+});
+
+test("Endless and Custom ignore Auto-stack", () => {
+  const a = startGame(createState(), "endless", 100);
+  assert.deepEqual(a.pile, []);
+});
+
+// --- Timer and Score ---
+const TIMED = (s = createState()) => setOption(s, "timerScore", true);
+const timedCashier = (now = 1000) => startCashier(TIMED(), seeded(1), now);
+
+test("a timed round records when it was dealt", () => {
+  assert.equal(timedCashier(1000).roundStartedAt, 1000);
+  assert.equal(startGame(TIMED(), "endless", 395, 700).roundStartedAt, 700);
+  assert.equal(startGiveChange(TIMED(), ODDS, seeded(1), 800).roundStartedAt, 800);
+  assert.equal(nextRound(startGame(TIMED(), "endless", 395, 0), 5, 900).roundStartedAt, 900);
+  assert.equal(nextCustomer(timedCashier(), seeded(2), 1500).roundStartedAt, 1500);
+  assert.equal(nextGiveChangeCustomer(startGiveChange(TIMED(), ODDS, seeded(1)), ODDS, seeded(2), 1600).roundStartedAt, 1600);
+});
+
+test("Cashier awards speed points and says so", () => {
+  const s = timedCashier();
+  const solved = submitAnswer(s, total(s.pile), 11000); // 10 s of the 20 s par
+  assert.equal(solved.lastPoints, 55);
+  assert.equal(solved.score, 55);
+  assert.equal(solved.message.text, `Correct! That is ${formatPence(total(s.pile))}. +55 points`);
+});
+
+test("Endless awards speed points against the 15 s par", () => {
+  const s = withPile(startGame(TIMED(), "endless", 395, 0), EXACT_395);
+  const solved = submitCheck(s, 7500);
+  assert.equal(solved.score, 55);
+  assert.match(solved.message.text, /\+55 points$/);
+});
+
+test("Give Change awards speed points against the 30 s par", () => {
+  const base = startGiveChange(TIMED(), ODDS, seeded(1), 0);
+  const s = { ...base, scenario: "exact", price: base.paid };
+  const solved = submitGiveChangeAnswer(s, "none", 15000);
+  assert.equal(solved.score, 55);
+  assert.match(solved.message.text, /\+55 points$/);
+});
+
+test("a par override changes the points", () => {
+  const s = timedCashier(0);
+  assert.equal(submitAnswer(s, total(s.pile), 5000, 10000).lastPoints, 55);
+});
+
+test("with the option off there are no points and the message is as before", () => {
+  const s = startCashier(createState(), seeded(1), 0);
+  const solved = submitAnswer(s, total(s.pile), 5000);
+  assert.equal(solved.score, 0);
+  assert.equal(solved.message.text, `Correct! That is ${formatPence(total(s.pile))}.`);
+});
+
+test("Custom is never scored", () => {
+  const s = withPile(startGame(TIMED(), "custom", 395, 0), EXACT_395);
+  const solved = submitCheck(s, 1000);
+  assert.equal(solved.score, 0);
+  assert.equal(solved.message.text, "Correct! You made exactly £3.95.");
+});
+
+test("a wrong answer changes neither the score, the points nor the round clock", () => {
+  const s = timedCashier();
+  const wrong = submitAnswer(s, total(s.pile) + 1, 5000);
+  assert.equal(wrong.score, 0);
+  assert.equal(wrong.lastPoints, 0);
+  assert.equal(wrong.roundStartedAt, 1000);
+});
+
+test("the score carries into the next customer and round but a new game starts it again", () => {
+  const s = timedCashier(0);
+  const solved = submitAnswer(s, total(s.pile), 10000);
+  assert.equal(nextCustomer(solved, seeded(2), 12000).score, solved.score);
+  assert.equal(nextCustomer(solved, seeded(2), 12000).lastPoints, 0);
+  const g = startGiveChange(TIMED(), ODDS, seeded(1), 0);
+  const gs = submitGiveChangeAnswer({ ...g, scenario: "exact", price: g.paid }, "none", 10000);
+  assert.equal(nextGiveChangeCustomer(gs, ODDS, seeded(2), 11000).score, gs.score);
+  const e = submitCheck(withPile(startGame(TIMED(), "endless", 395, 0), EXACT_395), 3000);
+  assert.equal(nextRound(e, 5, 4000).score, e.score);
+  for (const fresh of [startGame(e, "endless", 5), startCashier(solved, seeded(3)), startGiveChange(gs, ODDS, seeded(3))]) {
+    assert.equal(fresh.score, 0);
+  }
+});
+
+test("setOption stores a listed time limit and ignores anything else", () => {
+  const s = createState();
+  assert.equal(setOption(s, "timeLimit", 20).options.timeLimit, 20);
+  for (const bad of [15, "30", true, NaN]) assert.equal(setOption(s, "timeLimit", bad), s, String(bad));
+  assert.equal(setOption(s, "showCoins", 1), s);
+});
+
+// --- Time limit ---
+const LIMITED = (s = createState()) => setOption(setOption(s, "timerScore", true), "timeLimit", 20);
+
+test("expireRound ends an Endless round: not served, nothing scored, the round counted", () => {
+  const s = { ...startGame(LIMITED(), "endless", 395, 0), score: 40 };
+  const out = expireRound(s, 20000);
+  assert.deepEqual(
+    [out.solved, out.unserved, out.solvedAt, out.lastPoints, out.score, out.rounds],
+    [true, true, 20000, 0, 40, 1],
+  );
+  assert.deepEqual(out.message, { text: "Customer not served. The answer was £3.95.", kind: "hint" });
+});
+
+test("expireRound in Cashier shows what the coins came to", () => {
+  const s = startCashier(LIMITED(), seeded(1), 0);
+  const out = expireRound(s, 20000);
+  assert.equal(out.message.text, `Customer not served. The answer was ${formatPence(total(s.pile))}.`);
+  assert.equal(out.rounds, 1);
+});
+
+test("expireRound in Give Change shows the answer for each scenario", () => {
+  const base = startGiveChange(LIMITED(), ODDS, seeded(1), 0);
+  const text = (scenario, price) => expireRound({ ...base, paid: 500, scenario, price }, 1).message.text;
+  assert.equal(text("over", 440), "Customer not served. Change: £0.60.");
+  assert.equal(text("exact", 500), "Customer not served. No change due.");
+  assert.equal(text("under", 540), "Customer not served. They are £0.40 short.");
+});
+
+test("expireRound does nothing to a solved round", () => {
+  const s = { ...startGame(LIMITED(), "endless", 395, 0), solved: true, solvedAt: 5 };
+  assert.equal(expireRound(s, 20000), s);
+});
+
+test("Custom rounds are not counted when they expire", () => {
+  assert.equal(expireRound(startGame(createState(), "custom", 395, 0), 1).rounds, 0);
+});
+
+test("an unserved round is locked like a solved one", () => {
+  const out = expireRound(startCashier(LIMITED(), seeded(1), 0), 20000);
+  assert.equal(submitAnswer(out, total(out.pile), 21000), out);
+  assert.equal(addToPile(out, "1p"), out);
+  assert.equal(canAdvance(out, 20000 + 1999, 2000), false);
+  assert.equal(canAdvance(out, 20000 + 2000, 2000), true);
+});
+
+// --- Review fixes ---
+test("an answer given after the time limit is not scored: the customer is unserved", () => {
+  const cashier = startCashier(LIMITED(), seeded(1), 0); // 20 s limit
+  const late = submitAnswer(cashier, total(cashier.pile), 20000);
+  assert.equal(late.unserved, true);
+  assert.equal(late.score, 0);
+  assert.equal(late.rounds, 1);
+  assert.match(late.message.text, /^Customer not served\./);
+  assert.equal(submitAnswer(cashier, total(cashier.pile), 19999).unserved, false);
+  const endless = withPile(startGame(LIMITED(), "endless", 395, 0), EXACT_395);
+  assert.equal(submitCheck(endless, 20000).unserved, true);
+  const g = startGiveChange(LIMITED(), ODDS, seeded(1), 0);
+  assert.equal(submitGiveChangeAnswer({ ...g, scenario: "exact", price: g.paid }, "none", 20000).unserved, true);
+});
+
+test("Custom ignores a time limit when answering late", () => {
+  const s = withPile(startGame(LIMITED(), "custom", 395, 0), EXACT_395);
+  assert.equal(submitCheck(s, 999999).unserved, false);
+});
+
+test("Give Change deals the customer's stacks for the compact box when asked", () => {
+  for (let seed = 1; seed <= 20; seed++) {
+    const rng = seeded(seed);
+    const ids = randomHandful(rng);
+    const expected = layoutStacks(ids, rng, heightForBox(CUSTOMER_BOX_COMPACT_MM));
+    const dealt = startGiveChange(createState(), ODDS, seeded(seed), 0, true).pile;
+    assert.deepEqual(dealt.map(({ coinId, x, y, rot }) => ({ coinId, x, y, rot })), expected, `seed ${seed}`);
+  }
+  const next = nextGiveChangeCustomer(startGiveChange(createState(), ODDS, seeded(1)), ODDS, seeded(2), 0, true);
+  assert.ok(next.pile.length > 0);
 });

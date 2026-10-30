@@ -13,3 +13,9 @@ test("a mode row anchors its hidden radio so the radio cannot widen the home scr
   assert.match(rule(".mode input"), /width:\s*100%/);
   assert.match(rule(".mode input"), /inset:\s*0/);
 });
+
+test("each option badge takes its colour from a themed variable", () => {
+  assert.match(rule(".badge-easier"), /var\(--good\)/);
+  assert.match(rule(".badge-harder"), /var\(--bad\)/);
+  assert.match(rule(".badge-neutral"), /var\(--muted\)/);
+});

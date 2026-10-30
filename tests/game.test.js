@@ -16,6 +16,9 @@ import {
 } from "../src/game.js";
 import { rollScenario, priceFor, changeDue, judgeAnswer } from "../src/game.js";
 import { seeded, seq, pileOf } from "./pile-helper.js";
+import {
+  layoutStacks, stackOverlapMm,
+} from "../src/game.js";
 
 function approx(a, b, tol = 1e-9) {
   assert.ok(Math.abs(a - b) <= tol, `${a} != ${b}`);
@@ -841,4 +844,87 @@ test("at scale 1.5 the default pile box is 7 grid cells high and the change and 
 
 test("the Large Coins change and customer boxes still leave a positive play height", () => {
   atScale(1.5, () => assert.ok(heightForBox(changeBoxMm()) > 0 && heightForBox(customerBoxMm()) > 0));
+});
+
+const withUids = (entries) => entries.map((e, i) => ({ uid: i + 1, ...e }));
+
+test("layoutStacks returns every coin id once, one stack per denomination", () => {
+  const out = layoutStacks(["1p", "1p", "£2", "5p", "1p"], seeded(3));
+  assert.equal(out.length, 5);
+  const idx = out.map((e, i) => (e.coinId === "1p" ? i : -1)).filter((i) => i >= 0);
+  assert.deepEqual(idx, [idx[0], idx[0] + 1, idx[0] + 2]);
+  assert.deepEqual([...stackCounts(withUids(out)).values()], [3]);
+});
+
+test("a stack steps by STACK_STEP_MM and shares one rotation", () => {
+  const out = layoutStacks(["1p", "1p", "1p"], seeded(4));
+  const h = pileHeightDefaultMm();
+  for (let i = 1; i < 3; i++) {
+    assert.ok(Math.abs(out[i].x - out[i - 1].x - STACK_STEP_MM.x / pileWidthMm()) < 1e-9 || out[i].x === 0.5);
+    assert.ok(Math.abs(out[i].y - out[i - 1].y - STACK_STEP_MM.y / h) < 1e-9 || out[i].y === -0.5);
+    assert.equal(out[i].rot, out[0].rot);
+  }
+});
+
+test("no two stacks overlap at coin scale 1 in the default pile box", () => {
+  const h = pileHeightDefaultMm();
+  for (let seed = 1; seed <= 200; seed++) {
+    const ids = randomHandful(seeded(seed));
+    assert.equal(stackOverlapMm(layoutStacks(ids, seeded(seed + 1000), h), h), 0, `seed ${seed}`);
+  }
+});
+
+// The normal Give Change customer box is only 21.6 mm high of play area: some handfuls cannot fit without overlap,
+// so the layout must minimise it instead (measured: about two thirds of seeds are clear, the worst about 20 mm deep).
+test("in the normal Give Change customer box most handfuls are clear and the rest overlap little", () => {
+  const h = heightForBox(customerBoxMm());
+  let clear = 0;
+  for (let seed = 1; seed <= 200; seed++) {
+    const overlap = stackOverlapMm(layoutStacks(randomHandful(seeded(seed)), seeded(seed + 1000), h), h);
+    if (overlap === 0) clear++;
+    assert.ok(overlap <= 25, `seed ${seed}: ${overlap}`);
+  }
+  assert.ok(clear >= 100, `${clear} of 200 clear`);
+});
+
+test("stacks are not placed in value order", () => {
+  let ascending = 0;
+  let tried = 0;
+  for (let seed = 1; seed <= 50; seed++) {
+    const ids = ["1p", "2p", "5p", "10p", "20p"];
+    const out = layoutStacks(ids, seeded(seed));
+    const byX = [...out].sort((a, b) => a.x - b.x).map((e) => coinById(e.coinId).pence);
+    tried++;
+    if (byX.every((v, i) => i === 0 || v > byX[i - 1])) ascending++;
+  }
+  assert.ok(ascending < tried);
+});
+
+test("a 12-coin single stack stays inside the pile bounds", () => {
+  const out = layoutStacks(Array(MAX_HANDFUL).fill("£2"), seeded(9));
+  assert.equal(out.length, MAX_HANDFUL);
+  for (const e of out) assert.ok(Math.abs(e.x) <= 0.5 && Math.abs(e.y) <= 0.5);
+});
+
+test("tight boxes still lay out every coin", () => {
+  setCoinScale(1.5);
+  try {
+    for (const height of [heightForBox(customerBoxMm()), heightForBox(CUSTOMER_BOX_COMPACT_MM), pileHeightDefaultMm()]) {
+      for (let seed = 1; seed <= 50; seed++) {
+        const ids = randomHandful(seeded(seed));
+        const out = layoutStacks(ids, seeded(seed), height);
+        assert.equal(out.length, ids.length);
+        for (const e of out) {
+          assert.ok(Math.abs(e.x) <= 0.5 && Math.abs(e.y) <= 0.5 && !Number.isNaN(e.rot));
+        }
+      }
+    }
+  } finally {
+    setCoinScale(1);
+  }
+});
+
+test("the same seed gives the same layout", () => {
+  const ids = ["1p", "£2", "£2", "50p"];
+  assert.deepEqual(layoutStacks(ids, seeded(5)), layoutStacks(ids, seeded(5)));
 });
