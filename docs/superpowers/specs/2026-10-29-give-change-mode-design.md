@@ -1,5 +1,7 @@
 # Give Change mode: Design Spec
 
+> **Superseded in part:** the 4 cm / 6 cm pile sizes and the read-only customer pile are replaced by `2026-10-30-give-change-refinements-design.md`.
+
 Date: 2026-10-29
 Builds on: `2026-10-27-cashier-mode-design.md`, `2026-10-27-drag-coins-design.md`,
 `2026-10-27-messy-pile-design.md`, `2026-10-27-inspect-to-reveal-design.md`,
