@@ -312,7 +312,11 @@ h2.sec { width: 100%; max-width: 18.5rem; margin: 0.9rem auto 0.3rem; text-align
 .pile:empty::before { content: "Tap a coin to add it"; color: var(--muted); position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
 #screen-play.locked .coin, #screen-play.locked .pile-coin { opacity: 0.5; }
 
-.coin, .pile-coin { -webkit-touch-callout: none; user-select: none; }
+.coin, .pile-coin { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.coin *, .pile-coin * { -webkit-user-select: none; user-select: none; }
+.pile, .tray { -webkit-touch-callout: none; }
+#screen-play, #screen-play * { -webkit-user-select: none; user-select: none; }
+#screen-play input { -webkit-user-select: text; user-select: text; }
 
 .coin { touch-action: none; cursor: grab; }
 .coin.dragging-source { opacity: 0.5; }

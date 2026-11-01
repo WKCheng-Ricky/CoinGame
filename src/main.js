@@ -25,7 +25,7 @@ let shownChange;
 // each pile container has a key into state: the customer's (or player's) coins and the change
 const PILE_IDS = { pile: "play-pile", change: "change-pile" };
 const pileEl = (key) => $(PILE_IDS[key]);
-// tray adds, tray drops and Clear go to the change in Give Change mode, else to the pile
+// tray adds, tray drops and Reset go to the change in Give Change mode, else to the pile
 const activeKey = () => (state.mode === "give-change" ? "change" : "pile");
 // Short screens (an iPhone SE, a landscape phone) shrink the piles to the 4 cm box so the screen fits
 // (the player's pile, or both Give Change piles).
@@ -196,7 +196,7 @@ function render() {
   setText($("play-heading-label"), cashier ? "Customer's coins" : giveChange ? "Price" : "Make");
   setText($("play-target"), cashier ? "How much?" : giveChange ? formatPence(state.price) : formatPence(state.target));
   if (state.pile !== shownPile) {
-    renderPile($("play-pile"), state.pile, detachedUid.pile, !fixedPile, heightOf("pile"));
+    renderPile($("play-pile"), state.pile, detachedUid.pile, !fixedPile, heightOf("pile"), fixedPile);
     setText($("play-pile-summary"), cashier ? describePile(state.pile, "On the counter") : giveChange ? describePile(state.pile, "Customer paid") : describePile(state.pile));
     shownPile = state.pile;
     // drop dwells on removed pile coins (untouched pile and tray coins keep theirs)

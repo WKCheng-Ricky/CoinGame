@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { installDom } from "./dom-helper.js";
 import { COINS } from "../src/coins.js";
-import { renderPile, renderTray, showStackBadges, setText, announce } from "../src/render.js";
+import { renderPile, renderTray, showStackBadges, setText, announce, layerOrder } from "../src/render.js";
 
 const entry = (uid, coinId, x = 10, y = 10, rot = 0) => ({ uid, coinId, x, y, rot });
 
@@ -173,4 +173,32 @@ test("at scale 1.5 coins carry the scaled --d and the box custom properties do n
   } finally {
     setCoinScale(1);
   }
+}));
+
+test("renderPile with layerByPosition draws the buttons in layerOrder order", withDom((t, { document }) => {
+  const pile = [entry(1, "£2", -0.3, -0.3), entry(2, "5p", 0.3, 0.3)];
+  const c = document.createElement("div");
+  renderPile(c, pile, null, false, undefined, true);
+  assert.deepEqual([...c.children].map((b) => b.dataset.uid), layerOrder(pile).map((e) => String(e.uid)));
+  assert.deepEqual([...c.children].map((b) => b.dataset.uid), ["2", "1"]);
+  const plain = document.createElement("div");
+  renderPile(plain, pile, null, false);
+  assert.deepEqual([...plain.children].map((b) => b.dataset.uid), ["1", "2"]);
+}));
+
+test("layerByPosition keeps the same button elements when the order changes", withDom((t, { document }) => {
+  const c = document.createElement("div");
+  renderPile(c, [entry(1, "£2", -0.3, -0.3), entry(2, "5p", 0.3, 0.3)], null, false, undefined, true);
+  const before = new Map([...c.children].map((b) => [b.dataset.uid, b]));
+  renderPile(c, [entry(1, "£2", 0.4, 0.4), entry(2, "5p", -0.4, -0.4)], null, false, undefined, true);
+  assert.deepEqual([...c.children].map((b) => b.dataset.uid), ["1", "2"]);
+  for (const b of c.children) assert.equal(b, before.get(b.dataset.uid));
+}));
+
+test("layerByPosition renders an empty pile and a single coin", withDom((t, { document }) => {
+  const c = document.createElement("div");
+  renderPile(c, [], null, false, undefined, true);
+  assert.equal(c.children.length, 0);
+  renderPile(c, [entry(1, "1p", 0, 0)], null, false, undefined, true);
+  assert.equal(c.children.length, 1);
 }));

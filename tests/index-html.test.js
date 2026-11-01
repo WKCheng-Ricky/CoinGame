@@ -54,3 +54,11 @@ test("the tagline follows the title directly and the disclaimer ends the scrolli
   const note = doc.querySelector("#screen-home .home-body > p.disclaimer:last-child");
   assert.equal(note.textContent, "Unofficial educational game. Not affiliated with or endorsed by The Royal Mint. Coin pictures are original illustrations.");
 });
+
+test("the action row reads Reset then Check, with the primary button last in each state", () => {
+  const doc = load();
+  const row = doc.querySelector(".actions");
+  assert.deepEqual([...row.children].map((b) => b.id), ["btn-clear", "btn-check", "btn-next", "btn-change", "btn-again"]);
+  assert.equal(doc.getElementById("btn-clear").textContent, "Reset");
+  assert.ok(![...doc.querySelectorAll("button")].some((b) => b.textContent.trim() === "Clear"));
+});

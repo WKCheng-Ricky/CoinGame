@@ -43,7 +43,7 @@ there and are tapped, dragged and stacked as in Endless, and **Not enough!** and
 are 5 cm (4 cm on screens shorter than 700 px, such as an iPhone SE or a landscape phone). Coins can be dragged between
 the customer's pile and your change, either way. The customer's coins can be moved to your change but never added or
 removed: tapping one sends it to your change pile, and tapping it there sends it back. Giving back more than they paid
-is refused with a hint to press Clear. The tray, Check and Clear are at the bottom, as in Endless; Clear puts the
+is refused with a hint to press Reset. The tray, Check and Reset are at the bottom, as in Endless; Reset puts the
 customer's coins back as they paid them and empties your change. Pressing Check with no change counts as **No change**.
 Every pile and the tray use the same coin size. On a portrait phone (375 × 667 and up) the screen fits without
 scrolling; in a short landscape window the middle scrolls. Show Coins shows the running total of your change, and

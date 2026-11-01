@@ -808,7 +808,7 @@ test("addToPile, settleCoin and settleGroupCoins on the change pile use the comp
 
 // ---- paid amount, Clear and transfers between the Give Change piles ----
 
-const REFUSED = { text: "That is more than they paid. Press Clear to start again.", kind: "hint" };
+const REFUSED = { text: "That is more than they paid. Press Reset to start again.", kind: "hint" };
 
 // A Give Change round with fixed amounts: the customer pile is also the dealt pile.
 function round(pile, { paid = total(pile), price = paid - 50, scenario = "over", change = [] } = {}) {
@@ -890,7 +890,7 @@ test("sendCoin back is refused with the Clear hint when the customer pile would 
   assert.equal(t.pile, s.pile);
   assert.equal(t.change, s.change);
   assert.equal(t.message.kind, "hint");
-  assert.match(t.message.text, /Press Clear/);
+  assert.match(t.message.text, /Press Reset/);
 });
 
 test("sendCoin leaves your own change coins to be removed, and sends an own coin out of the customer pile", () => {

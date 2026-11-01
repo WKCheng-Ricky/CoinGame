@@ -232,7 +232,7 @@ export function settleGroupCoins(state, uids, leaderUid, from, key = "pile", com
 
 export function clearPile(state, key = "pile") {
   if (locked(state, key)) return state;
-  // Give Change: Clear also puts the customer's coins back where they were dealt.
+  // Give Change: Reset also puts the customer's coins back where they were dealt.
   if (state.mode === "give-change" && key === "change") {
     return { ...state, pile: state.dealt, change: [], message: NO_MESSAGE };
   }
@@ -240,7 +240,7 @@ export function clearPile(state, key = "pile") {
 }
 
 const PILE_KEYS = ["pile", "change"];
-const OVERPAID_HINT = { text: "That is more than they paid. Press Clear to start again.", kind: "hint" };
+const OVERPAID_HINT = { text: "That is more than they paid. Press Reset to start again.", kind: "hint" };
 
 // Give Change: moves coins between the customer's pile and the change pile. The leader lands at
 // (x, y) and the others keep their offset from it; the moved coins get new uids, leader last.
