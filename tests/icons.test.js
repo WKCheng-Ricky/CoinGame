@@ -15,7 +15,7 @@ function withDom(fn) {
 }
 
 test("ICON_NAMES lists the option, button and badge icons", () => {
-  assert.deepEqual(ICON_NAMES, ["eye", "enlarge", "layers", "coin-down", "stopwatch", "hourglass", "gear", "easier", "harder", "neutral"]);
+  assert.deepEqual(ICON_NAMES, ["eye", "enlarge", "layers", "coin-down", "stopwatch", "hourglass", "gear", "flag", "trophy", "easier", "harder", "neutral"]);
 });
 
 test("every icon is a decorative 24-unit svg with content", withDom(() => {

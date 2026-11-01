@@ -21,7 +21,7 @@ Play it live on https://wkcheng-ricky.github.io/CoinGame/
 
 | Mode | What you do |
 | --- | --- |
-| **Endless** | Build random targets from £0.01 to £9.99, one after another. Press Back to stop. |
+| **Endless** | Build random targets from £0.01 to £9.99, one after another. Press End (the flag) to finish and score, or Back (‹) to stop. |
 | **Custom** | Type an amount (up to £99.99) and build it with any coins. |
 | **Cashier** | A customer's coins are on the counter. Add them up, type the total and press Check. Next brings the next customer. |
 | **Give Change** | A customer pays for an item. Build their change from the tray and press Check, or press **No change** if they paid exactly or **Not enough!** if they paid too little (with **Short-paying customers** on, the default). Next brings the next customer. |
@@ -48,6 +48,14 @@ customer's coins back as they paid them and empties your change. Pressing Check 
 Every pile and the tray use the same coin size. On a portrait phone (375 × 667 and up) the screen fits without
 scrolling; in a short landscape window the middle scrolls. Show Coins shows the running total of your change, and
 turning off Short-paying customers means nobody underpays.
+
+**Ending a session and the leaderboard.** The play screen's top bar has Back (‹) on the left and End (the flag) on the
+right. When a score is being kept (Endless, Cashier or Give Change with the timer on), End asks "End the session and
+save your score?" and Back, once you have points, asks "Leave without saving your score?"; the clock stops while the
+question is open, and Keep playing (or Escape) carries on. Saving opens the Session over screen with your score,
+customers served and rank. Each mode and difficulty (Normal, Hard, Very hard) has its own top 10, kept only on this
+device; open it from Session over or the trophy on Home, where Clear scores needs a second press. Easy and custom
+settings are not ranked, and with no score to keep End and Back simply leave.
 
 ## Quick start
 

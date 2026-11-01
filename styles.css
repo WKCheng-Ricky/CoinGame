@@ -257,6 +257,9 @@ label { display: block; margin: 0.5rem 0 0.25rem; }
 .topbar { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.6rem; }
 .topbar > button { padding: 0.25rem 0.7rem; flex: none; }
 .topbar-info { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; }
+.topbar > #btn-back, .topbar > #btn-end { min-width: 44px; min-height: 44px; padding: 0; display: grid; place-items: center; }
+.topbar #btn-end .ico { width: 1.4rem; height: 1.4rem; }
+.topbar > #btn-back { font-size: 1.6rem; line-height: 1; }
 .dock { padding: 0.5rem 0.6rem; }
 .actions { justify-content: center; margin: 0.5rem 0 0; }
 
@@ -299,7 +302,7 @@ label { display: block; margin: 0.5rem 0 0.25rem; }
 h2.sec { width: 100%; max-width: 18.5rem; margin: 0.9rem auto 0.3rem; text-align: left; }
 .play { width: 100%; max-width: 18.5rem; margin: 0 auto 0.25rem; }
 
-#screen-custom, #screen-options { flex: 1; min-height: 0; overflow-y: auto; }
+#screen-custom, #screen-options, #screen-leaderboard, #screen-summary { flex: 1; min-height: 0; overflow-y: auto; }
 #screen-home { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .home-bar { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
 .home-end { display: flex; align-items: center; gap: 0.25rem; }
@@ -408,3 +411,17 @@ h2.sec { width: 100%; max-width: 18.5rem; margin: 0.9rem auto 0.3rem; text-align
   #screen-play.give-change .dock > .message:empty { min-height: 0; margin: 0; }
   #screen-play.give-change .actions { margin-top: 0.25rem; }
 }
+dialog { max-width: min(20rem, calc(100vw - 2rem)); padding: 1rem; border: 2px solid var(--line); border-radius: 0.8rem; background: var(--panel); color: var(--ink); }
+dialog::backdrop { background: #0006; }
+.dialog-actions { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.75rem; }
+#lb-mode, #lb-preset { grid-template-columns: repeat(3, 1fr); }
+#lb-table { width: 100%; max-width: 28rem; margin: 0.5rem auto; border-collapse: collapse; background: var(--panel); }
+#lb-table caption { padding: 0.4rem 0; font-weight: 700; }
+#lb-table th, #lb-table td { padding: 0.5rem 0.4rem; border-bottom: 1px solid var(--line); text-align: center; }
+#screen-summary { text-align: center; }
+.summary-score { margin: 0.25rem 0; font-size: 4rem; font-weight: 800; line-height: 1; }
+#screen-summary .row { justify-content: center; }
+#summary-rank { font-weight: 700; }
+#summary-leaderboard[hidden] { display: none; }
+#lb-table[hidden] { display: none; }
+#lb-table tr[aria-current="true"] { background: var(--accent-tint); font-weight: 700; }

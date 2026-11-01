@@ -19,6 +19,7 @@
       <header class="home-bar">
         <button id="btn-options" class="options-btn" type="button" aria-label="Options" title="Options"></button>
         <div class="home-end">
+        <button id="btn-leaderboard" class="options-btn" type="button" aria-label="Leaderboard" title="Leaderboard"></button>
         <button id="btn-theme" class="theme-toggle" type="button" data-state="auto" aria-label="Theme: Auto. Press to switch to Light" title="Theme: Auto. Press to switch to Light">
           <svg class="icon-auto" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg>
           <svg class="icon-light" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
@@ -51,6 +52,33 @@
       <p id="option-note" class="choice-note" aria-live="polite"></p>
     </section>
 
+    <section id="screen-leaderboard" hidden>
+      <button id="leaderboard-back" type="button">&lsaquo; Back</button>
+      <h1 tabindex="-1">Leaderboard</h1>
+      <div id="lb-mode" class="seg" role="radiogroup" aria-label="Game"></div>
+      <div id="lb-preset" class="seg" role="radiogroup" aria-label="Difficulty"></div>
+      <table id="lb-table">
+        <caption></caption>
+        <thead><tr><th scope="col">Rank</th><th scope="col">Score</th><th scope="col">Served</th><th scope="col">Date</th></tr></thead>
+        <tbody id="lb-list"></tbody>
+      </table>
+      <p id="lb-empty" class="sub" hidden>No scores yet. Play a timed game and press End to add one.</p>
+      <button id="lb-clear" type="button">Clear scores</button>
+    </section>
+
+    <section id="screen-summary" hidden>
+      <h1 id="summary-title" tabindex="-1">Session over</h1>
+      <p id="summary-line" class="sub"></p>
+      <p class="summary-score"><span class="sr-only">Score </span><span id="summary-score"></span></p>
+      <p id="summary-served"></p>
+      <p id="summary-rank" class="summary-rank" aria-live="polite"></p>
+      <div class="row">
+        <button id="summary-again" type="button" class="primary">Play again</button>
+        <button id="summary-leaderboard" type="button">Leaderboard</button>
+        <button id="summary-home" type="button">Home</button>
+      </div>
+    </section>
+
     <section id="screen-custom" hidden>
       <h1 tabindex="-1">Custom amount</h1>
       <form id="custom-form" novalidate>
@@ -66,13 +94,14 @@
 
     <section id="screen-play" data-show-coins="false" hidden>
       <header class="topbar">
-        <button id="btn-back">&lsaquo; Back</button>
+        <button id="btn-back" type="button" aria-label="Back" title="Back">&lsaquo;</button>
         <div class="topbar-info">
           <h1 id="play-heading" class="target" tabindex="-1"><span id="play-heading-label" class="label">Make</span> <span id="play-target"></span></h1>
           <p id="play-rounds" class="rounds" hidden></p>
           <p id="play-clock" class="rounds" hidden></p>
           <div id="play-countdown" class="countdown" aria-hidden="true" hidden><div id="play-countdown-bar" class="countdown-bar"></div></div>
         </div>
+        <button id="btn-end" type="button" aria-label="End and score" title="End and score"></button>
         <div id="topbar-customer" role="group" aria-labelledby="customer-coins-label" hidden>
           <p id="customer-coins-label" class="pile-label">Customer Coins:</p>
         </div>
@@ -116,6 +145,7 @@
         </div>
       </div>
     </section>
+    <dialog id="confirm-dialog" aria-labelledby="confirm-title"><h2 id="confirm-title"></h2><div class="dialog-actions"></div></dialog>
   </main>
   <script type="module" src="src/main.js"></script>
 </body>

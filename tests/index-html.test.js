@@ -62,3 +62,44 @@ test("the action row reads Reset then Check, with the primary button last in eac
   assert.equal(doc.getElementById("btn-clear").textContent, "Reset");
   assert.ok(![...doc.querySelectorAll("button")].some((b) => b.textContent.trim() === "Clear"));
 });
+
+test("the home top bar has an icon-only Leaderboard button before the theme toggle", () => {
+  const doc = load();
+  const btn = doc.querySelector(".home-bar .home-end #btn-leaderboard");
+  assert.ok(btn);
+  assert.equal(btn.getAttribute("aria-label"), "Leaderboard");
+  assert.equal(btn.textContent.trim(), "");
+  assert.equal(btn.nextElementSibling.id, "btn-theme");
+});
+
+test("the empty leaderboard message uses the spec wording", () => {
+  assert.equal(load().getElementById("lb-empty").textContent, "No scores yet. Play a timed game and press End to add one.");
+});
+
+test("the play top bar has an icon-only Back on the left and an End on the right", () => {
+  const doc = load();
+  const bar = doc.querySelector("#screen-play .topbar");
+  const back = doc.getElementById("btn-back");
+  assert.equal(back.textContent, "‹");
+  assert.equal(back.getAttribute("aria-label"), "Back");
+  assert.equal(back.getAttribute("title"), "Back");
+  assert.equal(bar.firstElementChild, back);
+  const end = doc.getElementById("btn-end");
+  assert.equal(end.parentElement, bar);
+  assert.equal(end.getAttribute("aria-label"), "End and score");
+  assert.equal(end.getAttribute("title"), "End and score");
+  assert.equal(end.textContent.trim(), "", "icon-only: no visible text");
+  assert.ok(end.previousElementSibling.matches(".topbar-info"));
+  assert.equal(end.nextElementSibling.id, "topbar-customer");
+});
+
+test("the dialog, summary and leaderboard screens exist and start hidden", () => {
+  const doc = load();
+  const dialog = doc.getElementById("confirm-dialog");
+  assert.equal(dialog.tagName, "DIALOG");
+  assert.ok(!dialog.hasAttribute("open"));
+  for (const id of ["screen-summary", "screen-leaderboard"]) {
+    assert.ok(doc.getElementById(id).hidden, id);
+    assert.ok(doc.querySelector(`#${id} h1`), `${id} has a heading to focus`);
+  }
+});

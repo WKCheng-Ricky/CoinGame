@@ -30,3 +30,13 @@ test("the home and options screens are not made unselectable", () => {
   assert.doesNotMatch(rule("#screen-home"), /user-select/);
   assert.doesNotMatch(rule("#screen-options"), /user-select/);
 });
+
+test("Back and End in the play top bar are at least 44 px square", () => {
+  const decl = rule(".topbar > #btn-back, .topbar > #btn-end");
+  assert.match(decl, /min-width:\s*44px/);
+  assert.match(decl, /min-height:\s*44px/);
+});
+
+test("the Session over buttons are centred under the centred text", () => {
+  assert.match(rule("#screen-summary .row"), /justify-content:\s*center/);
+});
