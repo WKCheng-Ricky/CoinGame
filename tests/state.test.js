@@ -29,7 +29,7 @@ test("createState has the expected shape", () => {
     mode: "endless", target: 0, pile: [], nextUid: 1, rounds: 0, solved: false, solvedAt: 0, unserved: false,
     roundStartedAt: 0, pausedAt: null, score: 0, lastPoints: 0,
     message: { text: "", kind: "" },
-    options: { showCoins: false, largeCoins: false, autoStack: true, shortPay: true, timerScore: true, timeLimit: 0 },
+    options: { showCoins: false, largeCoins: false, autoStack: true, shortPay: 5, timerScore: true, timeLimit: 0 },
     change: [], price: 0, scenario: "", paid: 0, dealt: [],
   });
   assert.equal(ADVANCE_DELAY_MS, 400);
@@ -188,9 +188,9 @@ test("setOption ignores unknown ids and non-boolean values and returns the same 
 });
 
 test("an option of a mode that is not selected can be set and reaches that mode", () => {
-  const s = setOption(createState(), "shortPay", false);
+  const s = setOption(createState(), "shortPay", 0);
   assert.equal(s.mode, "endless");
-  assert.equal(startGiveChange(s, { underpaid: 0, exactShare: 1 / 3 }, seeded(1)).options.shortPay, false);
+  assert.equal(startGiveChange(s, { underpaid: 0, exactShare: 1 / 3 }, seeded(1)).options.shortPay, 0);
 });
 
 test("selectMode sets the mode and keeps everything else", () => {

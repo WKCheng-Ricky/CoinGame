@@ -202,3 +202,13 @@ test("layerByPosition renders an empty pile and a single coin", withDom((t, { do
   renderPile(c, [entry(1, "1p", 0, 0)], null, false, undefined, true);
   assert.equal(c.children.length, 1);
 }));
+
+test("the badge sits on the stack member drawn on top, not the last one in pile order", withDom((t, { document }) => {
+  const c = document.createElement("div");
+  // same coin, linked into one stack; layerByPosition draws the upper-left member last, whatever the pile order
+  const pile = [entry(1, "20p", 0.5, 0.5), entry(2, "20p", 0.505, 0.505)];
+  renderPile(c, pile, null, true, undefined, true);
+  const top = c.children[c.children.length - 1];
+  assert.equal(top.querySelector(".stack-badge")?.textContent, "×2");
+  assert.equal(c.children[0].querySelector(".stack-badge"), null);
+}));

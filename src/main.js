@@ -227,7 +227,7 @@ function render() {
   $("change-total").hidden = !giveChange || !showCoins;
   // the answer buttons stay in place after a solve (so nothing shifts) but are disabled until the next customer
   $("btn-none").hidden = !giveChange;
-  $("btn-short").hidden = !giveChange || !state.options.shortPay;
+  $("btn-short").hidden = !giveChange || state.options.shortPay <= 0;
   $("btn-none").disabled = state.solved;
   $("btn-short").disabled = state.solved;
   $("play-tray").hidden = cashier;

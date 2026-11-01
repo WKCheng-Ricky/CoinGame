@@ -40,3 +40,19 @@ test("Back and End in the play top bar are at least 44 px square", () => {
 test("the Session over buttons are centred under the centred text", () => {
   assert.match(rule("#screen-summary .row"), /justify-content:\s*center/);
 });
+
+test("Cashier's label takes its own line and the question never wraps", () => {
+  assert.match(rule("#screen-play.cashier .label"), /display:\s*block/);
+  assert.match(rule("#screen-play.cashier .target #play-target"), /white-space:\s*nowrap/);
+});
+
+test("the primary action keeps one slot: Check, Next and Play again share the right-hand column", () => {
+  assert.match(rule(".actions"), /display:\s*grid/);
+  assert.match(rule(".actions .primary"), /grid-column:\s*2/);
+  assert.match(rule("#screen-play.cashier .actions .primary"), /grid-column:\s*2/);
+  assert.doesNotMatch(css, /cashier\.locked \.dock/);
+});
+
+test("the Play button on the home screen is centred", () => {
+  assert.match(rule(".play"), /display:\s*block/);
+});

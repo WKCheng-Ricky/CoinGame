@@ -183,7 +183,11 @@ export function renderPile(container, pile, excludeUid = null, removable = true,
 
 // excludeUid (a detached coin) does not count: it gets no badge and its former stack shows the reduced count
 export function showStackBadges(container, pile, excludeUid = null, heightMm = pileHeightDefaultMm()) {
-  const counts = stackCounts(excludeUid === null ? pile : pile.filter((e) => e.uid !== excludeUid), heightMm);
+  // the badge goes on the member drawn last (on top of its stack), so measure "last" in the drawn (DOM) order,
+  // which layerByPosition makes differ from the pile's order
+  const drawn = new Map([...container.children].map((el, i) => [Number(el.dataset.uid), i]));
+  const inDrawOrder = [...pile].sort((a, b) => (drawn.get(a.uid) ?? 0) - (drawn.get(b.uid) ?? 0));
+  const counts = stackCounts(excludeUid === null ? inDrawOrder : inDrawOrder.filter((e) => e.uid !== excludeUid), heightMm);
   for (const btn of container.children) {
     const uid = Number(btn.dataset.uid);
     updateBadge(btn, uid === excludeUid ? undefined : counts.get(uid));

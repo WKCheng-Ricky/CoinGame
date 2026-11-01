@@ -38,9 +38,9 @@ export function timingFromSearch(search) {
   };
 }
 
-// Give Change mode odds. `underpaid` is the chance a customer underpays (only with the shortPay option); tune it here.
+// Give Change mode odds. `underpaid` is the chance a customer underpays: the shortPay option is its percentage (0 is Off).
 export function giveChangeOdds(options) {
-  return { underpaid: options.shortPay ? 0.25 : 0, exactShare: 1 / 3 };
+  return { underpaid: (options.shortPay ?? 0) / 100, exactShare: 1 / 3 };
 }
 
 // Large Coins option: how much bigger every coin is drawn, with the pile box keeping its size on screen. Tune here.

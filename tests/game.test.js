@@ -646,6 +646,12 @@ test("describePile accepts a custom intro", () => {
 
 const ODDS = { underpaid: 0.25, exactShare: 1 / 3 };
 
+test("rollScenario underpays only when the first draw is below the 5% odds", () => {
+  const five = { underpaid: 0.05, exactShare: 1 / 3 };
+  assert.equal(rollScenario(five, seq([0.049])), "under");
+  assert.equal(rollScenario(five, seq([0.05, 0.1])), "exact");
+});
+
 test("rollScenario picks under, exact or over from the rng draws", () => {
   assert.equal(rollScenario(ODDS, seq([0.24])), "under");
   assert.equal(rollScenario(ODDS, seq([0.25, 0.32])), "exact");

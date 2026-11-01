@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const css = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
-const rule = (selector) => new RegExp(`^${selector.replace(/[.\s]/g, (c) => `\\${c}`)} \\{([^}]*)\\}`, "m").exec(css)?.[1] ?? "";
+const rule = (selector) => new RegExp(`^${selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} \\{([^}]*)\\}`, "m").exec(css)?.[1] ?? "";
 
 // The radios are hidden but still laid out; unanchored they stretch to the full-width global input rule
 // and poke out of the scrolling home screen, which then pans sideways.
@@ -20,11 +20,11 @@ test("each option badge takes its colour from a themed variable", () => {
   assert.match(rule(".badge-neutral"), /var\(--muted\)/);
 });
 
-test("an option row keeps its badge beside the label and the Time Limit choices in four columns", () => {
+test("an option row keeps its badge beside the label and a choice row has one column per choice", () => {
   assert.match(rule(".options label"), /flex-wrap:\s*nowrap/);
   assert.match(rule(".options .opt-text"), /min-width:\s*0/);
   assert.match(rule(".options .badge"), /flex:\s*none/);
-  assert.match(rule(".options .radios"), /grid-template-columns:\s*repeat\(4/);
+  assert.match(rule(".options .radios"), /grid-template-columns:\s*repeat\(var\(--cols,\s*4\),\s*1fr\)/);
 });
 
 // The Options page is its own screen, so its list sits on the page instead of in the home screen's narrow card.
@@ -66,4 +66,10 @@ test("the tagline hugs the title and the disclaimer is small muted text", () => 
   assert.match(rule("#screen-home h1"), /margin:\s*0\.25rem 0 0\.25rem/);
   assert.match(rule(".disclaimer"), /color:\s*var\(--muted\)/);
   assert.match(rule(".disclaimer"), /font-size:\s*0\.8rem/);
+});
+
+test("a dense choice row (more than four choices) stacks each radio above its label", () => {
+  const dense = rule('.options .radios[data-dense="true"] label');
+  assert.match(dense, /flex-direction:\s*column/);
+  assert.match(dense, /justify-content:\s*center/);
 });
