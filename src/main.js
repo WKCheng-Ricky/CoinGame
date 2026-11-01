@@ -601,7 +601,7 @@ $("custom-form").addEventListener("submit", (e) => {
 $("custom-back").addEventListener("click", () => showScreen("home"));
 $("btn-back").addEventListener("click", () => showScreen("home"));
 
-$("btn-options").prepend(icon("gear", 18));
+$("btn-options").prepend(icon("gear", 24));
 $("btn-options").addEventListener("click", () => showScreen("options"));
 $("options-back").addEventListener("click", () => {
   optionNotes.cancelAll();

@@ -42,3 +42,13 @@ test("badge is the effect word with its arrow icon", withDom(() => {
   assert.equal(b.textContent.trim(), "Harder");
   assert.equal(b.querySelectorAll("svg[aria-hidden='true']").length, 1);
 }));
+
+test("the gear is a toothed cogwheel with a centre hole, not rays", withDom(() => {
+  const svg = icon("gear");
+  const d = svg.querySelector("path").getAttribute("d");
+  assert.match(d, /^M/);
+  assert.ok(d.endsWith("Z"), "the outline is closed");
+  assert.equal(d.match(/[ML]/g).length, 32, "8 teeth of 4 corners each");
+  assert.doesNotMatch(d, /M12 2v3/, "no longer the sun-like rays");
+  assert.equal(svg.querySelector("circle").getAttribute("r"), "3");
+}));

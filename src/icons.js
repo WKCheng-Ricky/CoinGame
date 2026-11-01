@@ -10,7 +10,7 @@ const SHAPES = {
   "coin-down": [["circle", { cx: 12, cy: 12, r: 9 }], path("M12 7v10M8 13l4 4 4-4")],
   stopwatch: [["circle", { cx: 12, cy: 13, r: 8 }], path("M12 13V9M9 2h6M12 2v3")],
   hourglass: [path("M6 3h12M6 21h12M7 3c0 6 5 6 5 9s-5 3-5 9M17 3c0 6-5 6-5 9s5 3 5 9")],
-  gear: [["circle", { cx: 12, cy: 12, r: 3 }], path("M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1")],
+  gear: [path("M10.3 4.7L10.6 2.1L13.4 2.1L13.7 4.7L16.0 5.6L18.0 4.0L20.0 6.0L18.4 8.0L19.3 10.3L21.9 10.6L21.9 13.4L19.3 13.7L18.4 16.0L20.0 18.0L18.0 20.0L16.0 18.4L13.7 19.3L13.4 21.9L10.6 21.9L10.3 19.3L8.0 18.4L6.0 20.0L4.0 18.0L5.6 16.0L4.7 13.7L2.1 13.4L2.1 10.6L4.7 10.3L5.6 8.0L4.0 6.0L6.0 4.0L8.0 5.6Z"), ["circle", { cx: 12, cy: 12, r: 3 }]], // 8-tooth cogwheel
   easier: [path("M12 5l7 9H5z")], // up arrow
   harder: [path("M12 19l7-9H5z")], // down arrow
   neutral: [path("M5 10h14v4H5z")], // level bar

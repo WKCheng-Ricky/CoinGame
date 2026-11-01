@@ -44,3 +44,26 @@ test("the chip list has no fixed minimum height, so its row grows with the wrapp
   assert.doesNotMatch(chips, /(^|[;\s])min-height\s*:\s*[\d.]+/);
   assert.doesNotMatch(chips, /(^|[;\s])height\s*:\s*[\d.]+/);
 });
+
+test("the home bars stay put and only the middle scrolls", () => {
+  assert.match(rule(".home-bar"), /flex:\s*none/);
+  assert.match(rule(".home-bar"), /justify-content:\s*space-between/);
+  assert.match(rule(".home-foot"), /flex:\s*none/);
+  assert.match(rule(".home-body"), /min-height:\s*0/);
+  assert.match(rule(".home-body"), /overflow-y:\s*auto/);
+});
+
+test("the home title wraps rather than widening the screen, and the buttons are at least 44px", () => {
+  assert.match(rule("#screen-home h1"), /overflow-wrap:\s*anywhere/);
+  assert.match(rule(".options-btn"), /min-width:\s*44px/);
+  assert.match(rule(".options-btn"), /min-height:\s*44px/);
+  assert.doesNotMatch(rule(".options-btn"), /position:\s*absolute/);
+  assert.doesNotMatch(rule(".theme-toggle"), /position:\s*absolute/);
+});
+
+test("the tagline hugs the title and the disclaimer is small muted text", () => {
+  assert.match(rule(".tagline"), /margin:\s*0 0 0\.5rem/);
+  assert.match(rule("#screen-home h1"), /margin:\s*0\.25rem 0 0\.25rem/);
+  assert.match(rule(".disclaimer"), /color:\s*var\(--muted\)/);
+  assert.match(rule(".disclaimer"), /font-size:\s*0\.8rem/);
+});

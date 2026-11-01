@@ -34,7 +34,7 @@ Give the game its proper name and identity, and make the home screen fit more on
 
 ## Favicon
 
-- One SVG icon, `favicon.svg`, in the repository root: a simple flat coin (a gold disc with a darker rim and a "£" mark) that reads at 16 px. It is original artwork and shows no coin design or royal portrait.
+- One SVG icon, `favicon.svg`, in the repository root: a simple flat coin (a gold disc with a darker rim and an inner ring) that reads at 16 px. It is original artwork and shows no coin design or royal portrait.
 - `index.html` links it with `<link rel="icon" href="favicon.svg" type="image/svg+xml">`.
 - For iPhone home-screen use: `apple-touch-icon.png` (180 x 180, the same coin on a solid background) linked with `<link rel="apple-touch-icon" href="apple-touch-icon.png">`. It is generated once from the SVG and committed; no build step is added.
 - **Deploy:** the GitHub Pages job copies a fixed list of files into `_site/` (`.github/workflows/ci.yml`, and `tests/pages-site.test.js` asserts the list). Both new files are added to that list and to the test, or the icon would work locally and be missing in production.

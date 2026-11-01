@@ -1,8 +1,8 @@
-# Coin Game
+# Coin Counting Game
 
 ![CI](https://github.com/WKCheng-Ricky/CoinGame/actions/workflows/ci.yml/badge.svg)
 
-Match a target amount using UK coins (1p to £2). Works on desktop and mobile.
+Coin Counting Game: match a target amount using UK coins (1p to £2). Works on desktop and mobile.
 
 Play it live on https://wkcheng-ricky.github.io/CoinGame/
 

@@ -25,9 +25,9 @@ const localReferences = () => {
   return refs.filter((r) => r && !/^(https?:|data:|#)/.test(r));
 };
 
-test("staged entries are exactly the five runtime files", () => {
+test("staged entries are exactly the seven runtime files", () => {
   const entries = stagedEntries();
-  assert.deepEqual([...entries].sort(), ["fonts", "index.html", "src", "styles.css", "theme-boot.js"]);
+  assert.deepEqual([...entries].sort(), ["apple-touch-icon.png", "favicon.svg", "fonts", "index.html", "src", "styles.css", "theme-boot.js"]);
   for (const entry of entries) assert.ok(existsSync(new URL(entry, root)), `${entry} exists in the repo root`);
 });
 

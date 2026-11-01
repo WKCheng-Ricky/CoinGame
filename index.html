@@ -3,9 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-  <title>Coin Game</title>
+  <title>Coin Counting Game</title>
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#f6f3ec">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <script src="theme-boot.js"></script>
   <link rel="preload" href="fonts/NotoSans-SemiBold-subset.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="fonts/NotoSans-Bold-subset.woff2" as="font" type="font/woff2" crossorigin>
@@ -14,22 +16,31 @@
 <body>
   <main>
     <section id="screen-home">
-      <button id="btn-options" class="options-btn" type="button">Options</button>
-      <button id="btn-theme" class="theme-toggle" type="button" data-state="auto" aria-label="Theme: Auto. Press to switch to Light" title="Theme: Auto. Press to switch to Light">
-        <svg class="icon-auto" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg>
-        <svg class="icon-light" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
-        <svg class="icon-dark" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z" fill="currentColor"/></svg>
-      </button>
-      <h1 tabindex="-1">Coin Game</h1>
-      <p>Make the amount using UK coins.</p>
-      <h2 id="modes-heading" class="sec">Game</h2>
-      <div id="modes" class="modes" role="radiogroup" aria-labelledby="modes-heading"></div>
-      <h2 class="sec">Quick settings</h2>
-      <div id="presets" class="seg"></div>
-      <p id="preset-note" class="preset-note"></p>
-      <button id="btn-large" class="big-toggle" type="button"></button>
-      <ul id="chips" class="chips"></ul>
-      <button id="btn-play" class="primary play" type="button">Play</button>
+      <header class="home-bar">
+        <button id="btn-options" class="options-btn" type="button" aria-label="Options" title="Options"></button>
+        <div class="home-end">
+        <button id="btn-theme" class="theme-toggle" type="button" data-state="auto" aria-label="Theme: Auto. Press to switch to Light" title="Theme: Auto. Press to switch to Light">
+          <svg class="icon-auto" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg>
+          <svg class="icon-light" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+          <svg class="icon-dark" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z" fill="currentColor"/></svg>
+        </button>
+        </div>
+      </header>
+      <div class="home-body">
+        <h1 tabindex="-1">Coin Counting Game</h1>
+        <p class="tagline">Make the amount using UK coins.</p>
+        <h2 id="modes-heading" class="sec">Game</h2>
+        <div id="modes" class="modes" role="radiogroup" aria-labelledby="modes-heading"></div>
+        <h2 class="sec">Quick settings</h2>
+        <div id="presets" class="seg"></div>
+        <p id="preset-note" class="preset-note"></p>
+        <button id="btn-large" class="big-toggle" type="button"></button>
+        <ul id="chips" class="chips"></ul>
+        <p class="disclaimer">Unofficial educational game. Not affiliated with or endorsed by The Royal Mint. Coin pictures are original illustrations.</p>
+      </div>
+      <div class="home-foot">
+        <button id="btn-play" class="primary play" type="button">Play</button>
+      </div>
     </section>
 
     <section id="screen-options" hidden>
