@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { ICON_NAMES } from "../src/icons.js";
 import { PRESETS, presetOf, EFFECTS, MODE_IDS, OPTIONS, defaultOptions, isForcedOn, isOptionId, isValidValue, optionsFor, timerOn } from "../src/options.js";
 
-test("defaultOptions gives Show Coins and Large Coins off and Short-paying customers on", () => {
-  assert.deepEqual(defaultOptions(), { showCoins: false, largeCoins: false, autoStack: true, shortPay: true, timerScore: true, timeLimit: 0 });
+test("defaultOptions gives Show Coins and Large Coins off and Short-paying customers at 5%", () => {
+  assert.deepEqual(defaultOptions(), { showCoins: false, largeCoins: false, autoStack: true, shortPay: 5, timerScore: true, timeLimit: 0 });
 });
 
 test("optionsFor lists the global options, then the ones scoped to the mode", () => {
@@ -81,10 +81,10 @@ test("Time Limit is not offered in Custom", () => {
 });
 
 const VALUES = {
-  easy: { showCoins: true, autoStack: true, shortPay: false, timerScore: false, timeLimit: 0 },
-  normal: { showCoins: false, autoStack: true, shortPay: true, timerScore: true, timeLimit: 0 },
-  hard: { showCoins: false, autoStack: false, shortPay: true, timerScore: true, timeLimit: 30 },
-  veryHard: { showCoins: false, autoStack: false, shortPay: true, timerScore: true, timeLimit: 10 },
+  easy: { showCoins: true, autoStack: true, shortPay: 0, timerScore: false, timeLimit: 0 },
+  normal: { showCoins: false, autoStack: true, shortPay: 5, timerScore: true, timeLimit: 0 },
+  hard: { showCoins: false, autoStack: false, shortPay: 5, timerScore: true, timeLimit: 30 },
+  veryHard: { showCoins: false, autoStack: false, shortPay: 5, timerScore: true, timeLimit: 10 },
 };
 
 test("PRESETS lists Easy, Normal, Hard and Very hard with the spec's values", () => {
@@ -107,7 +107,7 @@ test("presetOf names each preset and gives null when any one of its five values 
       assert.notEqual(result, p.id, `${p.id} with ${key} changed`);
     }
   }
-  assert.equal(presetOf({ ...VALUES.normal, shortPay: false }), null);
+  assert.equal(presetOf({ ...VALUES.normal, shortPay: 0 }), null);
 });
 
 test("presetOf ignores Large Coins and counts a time limit as the timer being on", () => {
@@ -135,4 +135,22 @@ test("Auto-stack is on for Easy and Normal and off for Hard and Very hard", () =
   assert.deepEqual(PRESETS.map((p) => [p.id, p.values.autoStack]), [["easy", true], ["normal", true], ["hard", false], ["veryHard", false]]);
   // a limit chosen from Normal is not Hard: Hard has Auto-stack off
   assert.equal(presetOf({ ...VALUES.normal, timeLimit: 30 }), null);
+});
+
+test("shortPay is a choice option with the five percentages and default 5", () => {
+  const o = OPTIONS.find((x) => x.id === "shortPay");
+  assert.deepEqual(o.choices.map((c) => c.value), [0, 1, 5, 10, 25]);
+  assert.deepEqual(o.choices.map((c) => c.label), ["Off", "1%", "5%", "10%", "25%"]);
+  assert.equal(o.default, 5);
+});
+
+test("isValidValue accepts the five shortPay percentages and nothing else", () => {
+  for (const v of [0, 1, 5, 10, 25]) assert.equal(isValidValue("shortPay", v), true, String(v));
+  for (const v of [true, false, 7, "5", -1, 50]) assert.equal(isValidValue("shortPay", v), false, String(v));
+});
+
+test("a short-pay rate other than 5% (or Off for Easy) matches no preset, so the session is custom and unranked", () => {
+  assert.equal(presetOf(VALUES.normal), "normal");
+  assert.equal(presetOf(VALUES.easy), "easy");
+  for (const shortPay of [1, 10, 25]) assert.equal(presetOf({ ...VALUES.normal, shortPay }), null, String(shortPay));
 });

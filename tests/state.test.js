@@ -7,6 +7,7 @@ import {
   setOption, selectMode, moveCoin, settleCoin, addToPileAt, moveGroup, settleGroupCoins,
   startCashier, nextCustomer, submitAnswer, isContinuous,
   startGiveChange, nextGiveChangeCustomer, submitGiveChangeAnswer, transferCoins, sendCoin, expireRound, applyPreset,
+  isScored, exitPrompt, endSession, pauseClock, resumeClock,
 } from "../src/state.js";
 import { formatPence, layoutStacks, randomHandful, stackCounts, total, PUSH_FACTOR, PILE_WIDTH_MM, PILE_HEIGHT_MM, STACK_STEP_MM, detachNudge } from "../src/game.js";
 import { coinById } from "../src/coins.js";
@@ -26,9 +27,9 @@ const SPREAD = { ...createState(), target: 395, pile: [A, B, C], nextUid: 4 };
 test("createState has the expected shape", () => {
   assert.deepEqual(createState(), {
     mode: "endless", target: 0, pile: [], nextUid: 1, rounds: 0, solved: false, solvedAt: 0, unserved: false,
-    roundStartedAt: 0, score: 0, lastPoints: 0,
+    roundStartedAt: 0, pausedAt: null, score: 0, lastPoints: 0,
     message: { text: "", kind: "" },
-    options: { showCoins: false, largeCoins: false, autoStack: true, shortPay: true, timerScore: true, timeLimit: 0 },
+    options: { showCoins: false, largeCoins: false, autoStack: true, shortPay: 5, timerScore: true, timeLimit: 0 },
     change: [], price: 0, scenario: "", paid: 0, dealt: [],
   });
   assert.equal(ADVANCE_DELAY_MS, 400);
@@ -187,9 +188,9 @@ test("setOption ignores unknown ids and non-boolean values and returns the same 
 });
 
 test("an option of a mode that is not selected can be set and reaches that mode", () => {
-  const s = setOption(createState(), "shortPay", false);
+  const s = setOption(createState(), "shortPay", 0);
   assert.equal(s.mode, "endless");
-  assert.equal(startGiveChange(s, { underpaid: 0, exactShare: 1 / 3 }, seeded(1)).options.shortPay, false);
+  assert.equal(startGiveChange(s, { underpaid: 0, exactShare: 1 / 3 }, seeded(1)).options.shortPay, 0);
 });
 
 test("selectMode sets the mode and keeps everything else", () => {
@@ -808,7 +809,7 @@ test("addToPile, settleCoin and settleGroupCoins on the change pile use the comp
 
 // ---- paid amount, Clear and transfers between the Give Change piles ----
 
-const REFUSED = { text: "That is more than they paid. Press Clear to start again.", kind: "hint" };
+const REFUSED = { text: "That is more than they paid. Press Reset to start again.", kind: "hint" };
 
 // A Give Change round with fixed amounts: the customer pile is also the dealt pile.
 function round(pile, { paid = total(pile), price = paid - 50, scenario = "over", change = [] } = {}) {
@@ -890,7 +891,7 @@ test("sendCoin back is refused with the Clear hint when the customer pile would 
   assert.equal(t.pile, s.pile);
   assert.equal(t.change, s.change);
   assert.equal(t.message.kind, "hint");
-  assert.match(t.message.text, /Press Clear/);
+  assert.match(t.message.text, /Press Reset/);
 });
 
 test("sendCoin leaves your own change coins to be removed, and sends an own coin out of the customer pile", () => {
@@ -1274,4 +1275,63 @@ test("applyPreset sets the five values and leaves Large Coins alone", () => {
 test("applyPreset ignores an unknown id", () => {
   const s = createState();
   assert.equal(applyPreset(s, "nope"), s);
+});
+
+const scoredState = (over = {}) => ({ ...applyPreset(createState(), "normal"), mode: "cashier", ...over });
+
+test("isScored is true for the timed modes with the timer on, false for custom or with the timer off", () => {
+  assert.equal(isScored(scoredState()), true);
+  assert.equal(isScored(scoredState({ mode: "give-change" })), true);
+  assert.equal(isScored(scoredState({ mode: "custom" })), false);
+  assert.equal(isScored(applyPreset(scoredState(), "easy")), false);
+});
+
+test("exitPrompt asks only when scored, and Back with no score leaves at once", () => {
+  const scored = (score) => scoredState({ score });
+  const unscored = (score) => ({ ...applyPreset(createState(), "easy"), mode: "cashier", score });
+  assert.equal(exitPrompt(scored(0), "end"), "end");
+  assert.equal(exitPrompt(scored(5), "end"), "end");
+  assert.equal(exitPrompt(scored(0), "back"), null);
+  assert.equal(exitPrompt(scored(5), "back"), "back");
+  for (const button of ["end", "back"]) {
+    assert.equal(exitPrompt(unscored(0), button), null);
+    assert.equal(exitPrompt(unscored(5), button), null);
+  }
+});
+
+test("endSession reports mode, preset, score and customers served", () => {
+  const s = { ...applyPreset(createState(), "hard"), mode: "give-change", score: 120, rounds: 3 };
+  assert.deepEqual(endSession(s, "2026-10-31T10:00:00.000Z"), {
+    mode: "give-change", preset: "hard", score: 120, served: 3, at: "2026-10-31T10:00:00.000Z",
+  });
+});
+
+test("endSession preset is null for custom settings", () => {
+  const s = setOption({ ...applyPreset(createState(), "hard"), score: 10, rounds: 1 }, "timeLimit", 20);
+  assert.equal(endSession(s, "t").preset, null);
+});
+
+test("endSession does not change its input", () => {
+  const s = scoredState({ score: 7, rounds: 2 });
+  const copy = structuredClone(s);
+  endSession(s, "t");
+  assert.deepEqual(s, copy);
+});
+
+test("pauseClock then resumeClock leaves elapsed time and the countdown unchanged", () => {
+  const s = { ...createState(), roundStartedAt: 1000 };
+  const paused = pauseClock(s, 5000);
+  assert.equal(paused.pausedAt, 5000);
+  const resumed = resumeClock(paused, 9000);
+  assert.equal(resumed.roundStartedAt, 5000);
+  assert.equal(resumed.pausedAt, null);
+});
+
+test("pauseClock does nothing when solved or already paused, and resumeClock does nothing when not paused", () => {
+  const solved = { ...createState(), solved: true };
+  assert.equal(pauseClock(solved, 5000), solved);
+  const paused = { ...createState(), pausedAt: 3000 };
+  assert.equal(pauseClock(paused, 5000), paused);
+  const running = createState();
+  assert.equal(resumeClock(running, 5000), running);
 });

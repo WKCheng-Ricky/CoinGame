@@ -1,6 +1,6 @@
 import { COINS } from "./coins.js";
 import { arcLetters, fitFont, polygonPoints, reuleauxPath, shapeRadiusAt } from "./shapes.js";
-import { PILE_MARGIN_MM, PILE_WIDTH_MM, diameterOf, pileBox, pileHeightDefaultMm, pileMarginMm, stackCounts } from "./game.js";
+import { PILE_MARGIN_MM, PILE_WIDTH_MM, diameterOf, pileBox, pileHeightDefaultMm, pileMarginMm, pileWidthMm, stackCounts } from "./game.js";
 
 
 // Layout of one face, in viewBox units (the body is 92 wide, its rim line 70 wide).
@@ -141,7 +141,16 @@ export function coinLabel(coin, removable) {
   return removable ? `Remove ${coin.label}` : `${coin.label} coin`;
 }
 
-export function renderPile(container, pile, excludeUid = null, removable = true, heightMm = pileHeightDefaultMm()) {
+// The draw order that keeps every stack-count badge (bottom right of a coin) visible: coins further right or lower go
+// underneath, so the upper-left coin is on top. First is the bottom layer. Both axes are measured in millimetres
+// (x by the pile's width, y by its height), because the Give Change boxes are wide and short. Returns a copy.
+export function layerOrder(pile, heightMm = pileHeightDefaultMm()) {
+  const width = pileWidthMm();
+  const depth = (e) => e.x * width + e.y * heightMm;
+  return [...pile].sort((a, b) => depth(b) - depth(a) || a.uid - b.uid);
+}
+
+export function renderPile(container, pile, excludeUid = null, removable = true, heightMm = pileHeightDefaultMm(), layerByPosition = false) {
   container.style.setProperty("--pile-w-mm", PILE_WIDTH_MM + 2 * PILE_MARGIN_MM); // the box keeps its size at any coin scale
   container.style.setProperty("--pile-h-mm", heightMm + 2 * pileMarginMm());
   const existing = new Map([...container.children].map((el) => [el.dataset.uid, el]));
@@ -149,7 +158,7 @@ export function renderPile(container, pile, excludeUid = null, removable = true,
   for (const [uid, el] of existing) {
     if (!live.has(uid)) { el.remove(); existing.delete(uid); }
   }
-  const ordered = pile.map((entry) => {
+  const ordered = (layerByPosition ? layerOrder(pile, heightMm) : pile).map((entry) => {
     const key = String(entry.uid);
     let btn = existing.get(key);
     // uids restart per deal, so a reused uid may now hold a different coin: rebuild it
@@ -174,7 +183,11 @@ export function renderPile(container, pile, excludeUid = null, removable = true,
 
 // excludeUid (a detached coin) does not count: it gets no badge and its former stack shows the reduced count
 export function showStackBadges(container, pile, excludeUid = null, heightMm = pileHeightDefaultMm()) {
-  const counts = stackCounts(excludeUid === null ? pile : pile.filter((e) => e.uid !== excludeUid), heightMm);
+  // the badge goes on the member drawn last (on top of its stack), so measure "last" in the drawn (DOM) order,
+  // which layerByPosition makes differ from the pile's order
+  const drawn = new Map([...container.children].map((el, i) => [Number(el.dataset.uid), i]));
+  const inDrawOrder = [...pile].sort((a, b) => (drawn.get(a.uid) ?? 0) - (drawn.get(b.uid) ?? 0));
+  const counts = stackCounts(excludeUid === null ? inDrawOrder : inDrawOrder.filter((e) => e.uid !== excludeUid), heightMm);
   for (const btn of container.children) {
     const uid = Number(btn.dataset.uid);
     updateBadge(btn, uid === excludeUid ? undefined : counts.get(uid));

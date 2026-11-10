@@ -26,12 +26,14 @@ for (const [name, bad] of [["abc", "abc"], ["-5", "-5"], ["1.5", "1.5"], ["10001
   });
 }
 
-test("giveChangeOdds underpays 25% of customers with Short-paying customers on", () => {
-  assert.deepEqual(giveChangeOdds({ shortPay: true }), { underpaid: 0.25, exactShare: 1 / 3 });
+test("giveChangeOdds maps each choice to its percentage", () => {
+  for (const [shortPay, underpaid] of [[0, 0], [1, 0.01], [5, 0.05], [10, 0.1], [25, 0.25]]) {
+    assert.deepEqual(giveChangeOdds({ shortPay }), { underpaid, exactShare: 1 / 3 });
+  }
 });
 
-test("giveChangeOdds never underpays with Short-paying customers off", () => {
-  assert.deepEqual(giveChangeOdds({ shortPay: false }), { underpaid: 0, exactShare: 1 / 3 });
+test("giveChangeOdds gives 0 when shortPay is missing", () => {
+  assert.deepEqual(giveChangeOdds({}), { underpaid: 0, exactShare: 1 / 3 });
 });
 
 test("coinScaleFor is 1 normally and LARGE_COIN_SCALE with Large Coins", () => {

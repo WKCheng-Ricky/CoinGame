@@ -27,6 +27,8 @@ function choiceRows(o) {
   group.setAttribute("role", "radiogroup");
   group.setAttribute("aria-labelledby", labelId);
   group.setAttribute("aria-describedby", `option-help-${o.id}`);
+  group.style.setProperty("--cols", String(o.choices.length));
+  if (o.choices.length > 4) group.dataset.dense = "true"; // too many for the radio to sit beside its label
   for (const c of o.choices) {
     const input = el("input", { type: "radio", name: `opt-${o.id}`, value: String(c.value), autocomplete: "off" });
     input.dataset.option = o.id;

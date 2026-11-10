@@ -1,5 +1,5 @@
 import { COINS } from "./coins.js";
-import { MODE_IDS, PRESETS, defaultOptions, isValidValue, timerOn } from "./options.js";
+import { MODE_IDS, PRESETS, defaultOptions, isValidValue, presetOf, timerOn } from "./options.js";
 import { isExpired, parFor, scoreFor } from "./timer.js";
 import {
   CHANGE_BOX_COMPACT_MM, CUSTOMER_BOX_COMPACT_MM, changeDue, check, checkAnswer, clampPosition, formatPence,
@@ -14,7 +14,7 @@ const NO_MESSAGE = { text: "", kind: "" };
 export function createState() {
   return {
     mode: "endless", target: 0, pile: [], nextUid: 1, rounds: 0, solved: false, solvedAt: 0, unserved: false,
-    roundStartedAt: 0, score: 0, lastPoints: 0,
+    roundStartedAt: 0, pausedAt: null, score: 0, lastPoints: 0,
     message: NO_MESSAGE, options: defaultOptions(),
     change: [], price: 0, scenario: "", paid: 0, dealt: [],
   };
@@ -232,7 +232,7 @@ export function settleGroupCoins(state, uids, leaderUid, from, key = "pile", com
 
 export function clearPile(state, key = "pile") {
   if (locked(state, key)) return state;
-  // Give Change: Clear also puts the customer's coins back where they were dealt.
+  // Give Change: Reset also puts the customer's coins back where they were dealt.
   if (state.mode === "give-change" && key === "change") {
     return { ...state, pile: state.dealt, change: [], message: NO_MESSAGE };
   }
@@ -240,7 +240,7 @@ export function clearPile(state, key = "pile") {
 }
 
 const PILE_KEYS = ["pile", "change"];
-const OVERPAID_HINT = { text: "That is more than they paid. Press Clear to start again.", kind: "hint" };
+const OVERPAID_HINT = { text: "That is more than they paid. Press Reset to start again.", kind: "hint" };
 
 // Give Change: moves coins between the customer's pile and the change pile. The leader lands at
 // (x, y) and the others keep their offset from it; the moved coins get new uids, leader last.
@@ -322,4 +322,29 @@ export function expireRound(state, now) {
     rounds: state.mode === "custom" ? state.rounds : state.rounds + 1,
     message: { text: `Customer not served. ${answer}`, kind: "hint" },
   };
+}
+
+// Only timed rounds in the scoring modes count toward a leaderboard result.
+export const isScored = (state) => state.mode !== "custom" && timerOn(state.options);
+
+// Which confirmation (if any) leaving the round needs: "end" or "back", or null to leave at once.
+export function exitPrompt(state, button) {
+  if (!isScored(state)) return null;
+  if (button === "end") return "end";
+  return state.score > 0 ? "back" : null;
+}
+
+export const endSession = (state, at) => ({
+  mode: state.mode, preset: presetOf(state.options), score: state.score, served: state.rounds, at,
+});
+
+// Pausing freezes the round clock; resuming shifts the start forward by the paused time.
+export function pauseClock(state, now) {
+  if (state.solved || state.pausedAt !== null) return state;
+  return { ...state, pausedAt: now };
+}
+
+export function resumeClock(state, now) {
+  if (state.pausedAt === null) return state;
+  return { ...state, roundStartedAt: state.roundStartedAt + (now - state.pausedAt), pausedAt: null };
 }

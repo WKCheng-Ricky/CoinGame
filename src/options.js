@@ -11,7 +11,11 @@ export const OPTIONS = [
     id: "autoStack", label: "Auto-stack", icon: "layers", chip: "Auto-stack", hint: "Matching coins are stacked and spread apart", effect: "easier",
     why: "Easier: matching coins are stacked and kept apart", scope: ["cashier", "give-change"], default: true,
   },
-  { id: "shortPay", label: "Short-paying customers", icon: "coin-down", chip: "Short-paying", hint: "Customers may not pay enough", effect: "harder", why: "Harder: customers may not pay enough", scope: ["give-change"], default: true },
+  {
+    id: "shortPay", label: "Short-paying customers", icon: "coin-down", chip: "Short-paying", hint: "Customers may not pay enough", effect: "harder",
+    why: "Harder: customers may not pay enough", scope: ["give-change"], default: 5,
+    choices: [{ value: 0, label: "Off" }, { value: 1, label: "1%" }, { value: 5, label: "5%" }, { value: 10, label: "10%" }, { value: 25, label: "25%" }],
+  },
   {
     id: "timerScore", label: "Timer and Score", icon: "stopwatch", chip: "Timer", hint: "Time each question and score your speed", effect: "neutral",
     why: "Neutral: times each question and scores your speed", scope: ["endless", "cashier", "give-change"], default: true,
@@ -38,10 +42,10 @@ export const timerOn = (options) => Boolean(options.timerScore) || options.timeL
 
 // Difficulty presets: each sets exactly these five options (never Large Coins). Normal is the default.
 export const PRESETS = [
-  { id: "easy", label: "Easy", values: { showCoins: true, autoStack: true, shortPay: false, timerScore: false, timeLimit: 0 } },
-  { id: "normal", label: "Normal", values: { showCoins: false, autoStack: true, shortPay: true, timerScore: true, timeLimit: 0 } },
-  { id: "hard", label: "Hard", values: { showCoins: false, autoStack: false, shortPay: true, timerScore: true, timeLimit: 30 } },
-  { id: "veryHard", label: "Very hard", values: { showCoins: false, autoStack: false, shortPay: true, timerScore: true, timeLimit: 10 } },
+  { id: "easy", label: "Easy", values: { showCoins: true, autoStack: true, shortPay: 0, timerScore: false, timeLimit: 0 } },
+  { id: "normal", label: "Normal", values: { showCoins: false, autoStack: true, shortPay: 5, timerScore: true, timeLimit: 0 } },
+  { id: "hard", label: "Hard", values: { showCoins: false, autoStack: false, shortPay: 5, timerScore: true, timeLimit: 30 } },
+  { id: "veryHard", label: "Very hard", values: { showCoins: false, autoStack: false, shortPay: 5, timerScore: true, timeLimit: 10 } },
 ];
 
 // The preset the options match, or null. Timer and Score counts as on whenever a time limit is set.

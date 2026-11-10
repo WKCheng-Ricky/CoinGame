@@ -4,7 +4,7 @@ import { installDom } from "./dom-helper.js";
 import { MODES, mountHome } from "../src/home.js";
 import { MODE_IDS, PRESETS } from "../src/options.js";
 
-const OPTS = { showCoins: false, largeCoins: false, autoStack: true, shortPay: true, timerScore: true, timeLimit: 0 };
+const OPTS = { showCoins: false, largeCoins: false, autoStack: true, shortPay: 5, timerScore: true, timeLimit: 0 };
 
 function withHome(fn) {
   return async () => {
@@ -59,15 +59,15 @@ test("the options list follows the selected mode", withHome(({ document, home })
   assert.deepEqual(boxes(document).map((b) => b.dataset.option), ["showCoins", "largeCoins", "timerScore"]);
   assert.equal(boxes(document)[0].checked, false);
   home.update("give-change", OPTS);
-  assert.deepEqual(boxes(document).map((b) => b.dataset.option), ["showCoins", "largeCoins", "autoStack", "shortPay", "timerScore"]);
-  assert.equal(boxes(document)[3].checked, true);
+  assert.deepEqual(boxes(document).map((b) => b.dataset.option), ["showCoins", "largeCoins", "autoStack", "timerScore"]);
+  assert.deepEqual(document.querySelectorAll('input[name="opt-shortPay"]').length, 5);
 }));
 
 test("option values survive switching modes", withHome(({ document, home }) => {
-  home.update("endless", { showCoins: true, largeCoins: false, autoStack: false, shortPay: false, timerScore: false, timeLimit: 0 });
+  home.update("endless", { showCoins: true, largeCoins: false, autoStack: false, shortPay: 0, timerScore: false, timeLimit: 0 });
   assert.equal(boxes(document)[0].checked, true);
-  home.update("give-change", { showCoins: true, largeCoins: false, autoStack: false, shortPay: false, timerScore: false, timeLimit: 0 });
-  assert.deepEqual(boxes(document).map((b) => b.checked), [true, false, false, false, false]);
+  home.update("give-change", { showCoins: true, largeCoins: false, autoStack: false, shortPay: 0, timerScore: false, timeLimit: 0 });
+  assert.deepEqual(boxes(document).map((b) => b.checked), [true, false, false, false]);
 }));
 
 test("an update in the same mode keeps the focused checkbox", withHome(({ document, home }) => {
@@ -82,9 +82,9 @@ test("an update in the same mode keeps the focused checkbox", withHome(({ docume
 
 test("each option label carries its hint as a title and a described-by reason line", withHome(({ document, home }) => {
   home.update("give-change", OPTS);
-  const label = boxes(document)[3].closest("label");
-  assert.equal(label.title, "Customers may not pay enough");
-  assert.equal(document.getElementById(boxes(document)[3].getAttribute("aria-describedby")).textContent, "Harder: customers may not pay enough");
+  const label = boxes(document)[2].closest("label");
+  assert.equal(label.title, "Matching coins are stacked and spread apart");
+  assert.equal(document.getElementById(boxes(document)[2].getAttribute("aria-describedby")).textContent, "Easier: matching coins are stacked and kept apart");
 }));
 
 test("a radio change calls onMode, a checkbox change calls onOption, Play calls onPlay with the mode", withHome(({ window, document, home, calls }) => {
@@ -102,9 +102,9 @@ test("a radio change calls onMode, a checkbox change calls onOption, Play calls 
 test("each option shows an icon and the effect word", withHome(({ document, home }) => {
   home.update("give-change", OPTS);
   const badge = (i) => boxes(document)[i].closest("label").querySelector(".badge");
-  assert.ok(badge(3).classList.contains("badge-harder"));
-  assert.equal(badge(3).textContent.trim(), "Harder");
-  assert.equal(badge(3).querySelectorAll('svg[aria-hidden="true"]').length, 1);
+  const harder = document.querySelector("#options .opt-head .badge-harder"); // the Short-paying choice row's header
+  assert.equal(harder.textContent.trim(), "Harder");
+  assert.equal(harder.querySelectorAll('svg[aria-hidden="true"]').length, 1);
   assert.equal(badge(0).textContent.trim(), "Easier");
   assert.equal(badge(1).textContent.trim(), "Neutral");
 }));
@@ -151,7 +151,7 @@ test("a time limit checks and disables Timer and Score, and clearing it restores
 }));
 
 // --- Quick settings, chips and row icons ---
-const HARD = { ...OPTS, showCoins: false, autoStack: false, shortPay: true, timerScore: true, timeLimit: 30 };
+const HARD = { ...OPTS, showCoins: false, autoStack: false, shortPay: 5, timerScore: true, timeLimit: 30 };
 const presetRadios = (document) => [...document.querySelectorAll("#presets input[type=radio]")];
 const chipTexts = (document) => [...document.querySelectorAll("#chips li")].map((li) => li.textContent.trim());
 
@@ -169,7 +169,7 @@ test("the Difficulty group has four presets in order, Normal checked for the def
 test("a matching preset is checked, and custom settings check none and say so", withHome(({ document, home }) => {
   home.update("cashier", HARD);
   assert.deepEqual(presetRadios(document).filter((r) => r.checked).map((r) => r.value), ["hard"]);
-  home.update("cashier", { ...HARD, shortPay: false });
+  home.update("cashier", { ...HARD, shortPay: 0 });
   assert.deepEqual(presetRadios(document).filter((r) => r.checked), []);
   assert.equal(document.getElementById("preset-note").textContent, "Custom settings");
 }));
@@ -202,13 +202,13 @@ test("the chips show the options that are on, in registry order, never Large Coi
   home.update("cashier", { ...HARD, showCoins: true, largeCoins: true });
   assert.deepEqual(chipTexts(document), ["Show Coins", "Timer", "Limit 30 s"]);
   home.update("give-change", OPTS);
-  assert.deepEqual(chipTexts(document), ["Auto-stack", "Short-paying", "Timer"]);
+  assert.deepEqual(chipTexts(document), ["Auto-stack", "Short-paying 5%", "Timer"]);
   home.update("endless", OPTS); // Auto-stack and Short-paying are not options of Endless
   assert.deepEqual(chipTexts(document), ["Timer"]);
 }));
 
 test("with nothing on the chips say so, and the list is labelled", withHome(({ document, home }) => {
-  home.update("cashier", { ...OPTS, autoStack: false, timerScore: false, shortPay: false });
+  home.update("cashier", { ...OPTS, autoStack: false, timerScore: false, shortPay: 0 });
   assert.deepEqual(chipTexts(document), ["No options on"]);
   const list = document.getElementById("chips");
   assert.equal(list.getAttribute("role"), "list");
@@ -229,4 +229,39 @@ test("each option row has an icon and the Options-for line names the mode", with
   for (const row of rows) assert.ok(row.querySelector("svg.ico"), row.textContent);
   home.update("give-change", OPTS);
   assert.equal(document.getElementById("options-for").textContent, "Options for Give Change");
+}));
+
+test("the Short-paying row is a labelled radio group with five choices and 5% checked by default", withHome(({ document, home }) => {
+  home.update("give-change", OPTS);
+  const group = [...document.querySelectorAll('[role="radiogroup"][aria-labelledby]')].find((g) => g.querySelector('input[name="opt-shortPay"]'));
+  assert.equal(document.getElementById(group.getAttribute("aria-labelledby")).textContent, "Short-paying customers");
+  const inputs = [...group.querySelectorAll("input")];
+  assert.deepEqual(inputs.map((r) => r.value), ["0", "1", "5", "10", "25"]);
+  assert.deepEqual(inputs.filter((r) => r.checked).map((r) => r.value), ["5"]);
+  assert.deepEqual([...group.querySelectorAll(".opt-text")].map((t) => t.textContent), ["Off", "1%", "5%", "10%", "25%"]);
+}));
+
+test("the Short-paying chip reads its rate, disappears when Off, and 25% means Custom settings", withHome(({ document, home }) => {
+  home.update("give-change", OPTS);
+  assert.ok(chipTexts(document).includes("Short-paying 5%"));
+  home.update("give-change", { ...OPTS, shortPay: 0 });
+  assert.ok(!chipTexts(document).some((t) => t.startsWith("Short-paying")));
+  home.update("give-change", { ...OPTS, shortPay: 25 });
+  assert.ok(chipTexts(document).includes("Short-paying 25%"));
+  assert.equal(document.getElementById("preset-note").textContent, "Custom settings");
+  assert.equal([...document.querySelectorAll('#presets input')].filter((r) => r.checked).length, 0);
+}));
+
+test("each choice group sets --cols to its number of choices", withHome(({ document, home }) => {
+  home.update("give-change", OPTS);
+  const cols = (name) => document.querySelector(`input[name="${name}"]`).closest(".radios").style.getPropertyValue("--cols");
+  assert.equal(cols("opt-shortPay"), "5");
+  assert.equal(cols("opt-timeLimit"), "4");
+}));
+
+test("a choice row of more than four choices is marked dense so its radios stack above their labels", withHome(({ document, home }) => {
+  home.update("give-change", OPTS);
+  const group = (name) => document.querySelector(`input[name="${name}"]`).closest(".radios");
+  assert.equal(group("opt-shortPay").dataset.dense, "true");
+  assert.equal(group("opt-timeLimit").dataset.dense, undefined);
 }));

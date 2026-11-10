@@ -84,7 +84,7 @@ jobs:
       - name: Stage site files
         run: |
           mkdir _site
-          cp -r index.html styles.css theme-boot.js src fonts _site/
+          cp -r index.html styles.css theme-boot.js favicon.svg apple-touch-icon.png src fonts _site/
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:

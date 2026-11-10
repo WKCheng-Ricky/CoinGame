@@ -9,14 +9,19 @@ import { timerOn } from "./options.js";
 import { clockText, formatClock, isExpired, timeLeftMs } from "./timer.js";
 import { applyTheme, getStorage, nextTheme, readTheme, saveTheme, themeLabel } from "./theme.js";
 import { announce, renderPile, renderTray, setText, showStackBadges } from "./render.js";
+import { boardId, createScoreStore } from "./scores.js";
+import { createChoiceDialog } from "./confirm.js";
+import { mountLeaderboard } from "./leaderboard.js";
+import { mountSummary } from "./summary.js";
 import {
   addToPile, canAdvance, clearPile, createState, isContinuous, nextGiveChangeCustomer, nextCustomer, nextRound, startCashier, startGiveChange, submitAnswer,
   addToPileAt, moveCoin, moveGroup, removeFromPile, settleCoin, settleGroupCoins, setOption, selectMode,
   applyPreset, pileHeightMm, startGame, submitCheck, submitGiveChangeAnswer, transferCoins, sendCoin, expireRound,
+  endSession, exitPrompt, pauseClock, resumeClock,
 } from "./state.js";
 
 const $ = (id) => document.getElementById(id);
-const SCREENS = ["home", "custom", "options", "play"];
+const SCREENS = ["home", "custom", "options", "play", "summary", "leaderboard"];
 
 let state = createState();
 let shownMessage = state.message;
@@ -25,7 +30,7 @@ let shownChange;
 // each pile container has a key into state: the customer's (or player's) coins and the change
 const PILE_IDS = { pile: "play-pile", change: "change-pile" };
 const pileEl = (key) => $(PILE_IDS[key]);
-// tray adds, tray drops and Clear go to the change in Give Change mode, else to the pile
+// tray adds, tray drops and Reset go to the change in Give Change mode, else to the pile
 const activeKey = () => (state.mode === "give-change" ? "change" : "pile");
 // Short screens (an iPhone SE, a landscape phone) shrink the piles to the 4 cm box so the screen fits
 // (the player's pile, or both Give Change piles).
@@ -165,12 +170,13 @@ const LOW_SECONDS = 5; // the countdown bar turns to the warning colour for the 
 const limitSeconds = () => (state.mode === "custom" ? 0 : state.options.timeLimit);
 
 // The round clock: elapsed time (or time left, with a limit) and running score, frozen once the round is over.
-// When the limit runs out the customer is not served.
+// When the limit runs out the customer is not served. A paused round (a dialog is open) is stopped at pausedAt.
 function tickClock() {
   if ($("play-clock").hidden || $("screen-play").hidden) return;
-  const now = performance.now();
+  const paused = state.pausedAt !== null;
+  const now = paused ? state.pausedAt : performance.now();
   const limit = limitSeconds();
-  if (!state.solved && isExpired(state.roundStartedAt, now, limit)) {
+  if (!state.solved && !paused && isExpired(state.roundStartedAt, now, limit)) {
     update(expireRound(state, now));
     document.querySelector(".actions button:not([hidden])").focus();
     return;
@@ -196,7 +202,7 @@ function render() {
   setText($("play-heading-label"), cashier ? "Customer's coins" : giveChange ? "Price" : "Make");
   setText($("play-target"), cashier ? "How much?" : giveChange ? formatPence(state.price) : formatPence(state.target));
   if (state.pile !== shownPile) {
-    renderPile($("play-pile"), state.pile, detachedUid.pile, !fixedPile, heightOf("pile"));
+    renderPile($("play-pile"), state.pile, detachedUid.pile, !fixedPile, heightOf("pile"), fixedPile);
     setText($("play-pile-summary"), cashier ? describePile(state.pile, "On the counter") : giveChange ? describePile(state.pile, "Customer paid") : describePile(state.pile));
     shownPile = state.pile;
     // drop dwells on removed pile coins (untouched pile and tray coins keep theirs)
@@ -221,7 +227,7 @@ function render() {
   $("change-total").hidden = !giveChange || !showCoins;
   // the answer buttons stay in place after a solve (so nothing shifts) but are disabled until the next customer
   $("btn-none").hidden = !giveChange;
-  $("btn-short").hidden = !giveChange || !state.options.shortPay;
+  $("btn-short").hidden = !giveChange || state.options.shortPay <= 0;
   $("btn-none").disabled = state.solved;
   $("btn-short").disabled = state.solved;
   $("play-tray").hidden = cashier;
@@ -533,7 +539,7 @@ $("btn-none").addEventListener("click", () => answerGiveChange("none"));
 $("btn-short").addEventListener("click", () => answerGiveChange("short"));
 // Enter (or Ctrl/Cmd+Enter) is a shortcut for Check on the play screen
 document.addEventListener("keydown", (e) => {
-  if (e.defaultPrevented || $("screen-play").hidden || state.solved || !isCheckShortcut(e)) return;
+  if (e.defaultPrevented || dialog.isOpen() || $("screen-play").hidden || state.solved || !isCheckShortcut(e)) return;
   e.preventDefault();
   runCheck();
 });
@@ -573,6 +579,7 @@ function startSelected(mode) {
     update(startGiveChange(state, giveChangeOdds(state.options), Math.random, performance.now(), compactQuery.matches));
   }
   showScreen("play");
+  tickClock(); // render's tick ran while the screen was hidden, so the clock still shows the last session
 }
 
 function openCustom(prefill) {
@@ -599,9 +606,80 @@ $("custom-form").addEventListener("submit", (e) => {
   showScreen("play");
 });
 $("custom-back").addEventListener("click", () => showScreen("home"));
-$("btn-back").addEventListener("click", () => showScreen("home"));
 
-$("btn-options").prepend(icon("gear", 18));
+const store = createScoreStore(getStorage(window));
+const dialog = createChoiceDialog($("confirm-dialog"));
+const KEEP = { id: "keep", label: "Keep playing" };
+const ASK = {
+  end: ["End the session and save your score?", [{ id: "save", label: "End and save" }, KEEP]],
+  back: ["Leave without saving your score?", [{ id: "save", label: "Save score and leave" }, { id: "discard", label: "Leave without saving" }, KEEP]],
+};
+
+// Bank the session: record it on its board when ranked (a preset and a score above 0) and show the summary.
+let lastResult = null;
+let lastRank = null;
+function finish() {
+  const result = endSession(state, new Date().toISOString());
+  const id = result.preset === null ? null : boardId(result.mode, result.preset);
+  const rank = id !== null && result.score > 0 ? store.add(id, { score: result.score, served: result.served, at: result.at }) : null;
+  lastResult = result;
+  lastRank = rank;
+  summary.show(result, rank, id === null ? 0 : store.list(id).length);
+  showScreen("summary");
+}
+
+// Back and End: a scored session asks first, with the clock stopped while the question is open.
+async function leave(button) {
+  const ask = exitPrompt(state, button);
+  if (ask === null) { showScreen("home"); return; }
+  update(pauseClock(state, performance.now()));
+  const choice = await dialog.ask(...ASK[ask]);
+  if (choice === "save") finish();
+  else if (choice === "discard") showScreen("home");
+  else {
+    update(resumeClock(state, performance.now()));
+    $(button === "end" ? "btn-end" : "btn-back").focus();
+  }
+}
+$("btn-back").addEventListener("click", () => leave("back"));
+$("btn-end").prepend(icon("flag", 24));
+$("btn-end").addEventListener("click", () => leave("end"));
+
+// the leaderboard's Back returns to where it was opened: Home or the summary
+let leaderboardFrom = "home";
+function openLeaderboard(from, mode, preset, rank) {
+  leaderboardFrom = from;
+  leaderboard.show(mode, preset, rank ?? 0);
+  showScreen("leaderboard");
+}
+const leaderboard = mountLeaderboard(
+  {
+    mode: $("lb-mode"), preset: $("lb-preset"), list: $("lb-list"), empty: $("lb-empty"),
+    caption: document.querySelector("#lb-table caption"), clear: $("lb-clear"), back: $("leaderboard-back"),
+  },
+  {
+    store,
+    onBack: () => {
+      showScreen(leaderboardFrom);
+      $(leaderboardFrom === "home" ? "btn-leaderboard" : "summary-leaderboard").focus();
+    },
+  },
+);
+const summary = mountSummary(
+  {
+    title: $("summary-title"), line: $("summary-line"), score: $("summary-score"), served: $("summary-served"),
+    rank: $("summary-rank"), again: $("summary-again"), leaderboard: $("summary-leaderboard"), home: $("summary-home"),
+  },
+  {
+    onAgain: () => startSelected(state.mode),
+    onLeaderboard: () => openLeaderboard("summary", lastResult.mode, lastResult.preset, lastRank),
+    onHome: () => showScreen("home"),
+  },
+);
+$("btn-leaderboard").prepend(icon("trophy", 24));
+$("btn-leaderboard").addEventListener("click", () => openLeaderboard("home", "endless", "normal"));
+
+$("btn-options").prepend(icon("gear", 24));
 $("btn-options").addEventListener("click", () => showScreen("options"));
 $("options-back").addEventListener("click", () => {
   optionNotes.cancelAll();

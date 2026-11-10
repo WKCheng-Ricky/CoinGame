@@ -142,6 +142,9 @@ label { display: block; margin: 0.5rem 0 0.25rem; }
 .row { display: flex; flex-wrap: wrap; gap: 0.75rem; margin: 0.75rem 0; }
 .error { color: var(--bad); min-height: 1.4em; margin: 0.5rem 0; }
 
+/* Cashier's long label would wrap beside "How much?": the label takes its own line and the question never breaks */
+#screen-play.cashier .label { display: block; }
+#screen-play.cashier .target #play-target { white-space: nowrap; }
 .label { color: var(--muted); font-size: 0.9rem; font-weight: 400; }
 .target { margin: 0; font-size: clamp(1.2rem, 5vw, 1.75rem); font-weight: 800; line-height: 1.2; text-align: center; }
 [tabindex="-1"]:focus { outline: none; }
@@ -257,19 +260,25 @@ label { display: block; margin: 0.5rem 0 0.25rem; }
 .topbar { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.6rem; }
 .topbar > button { padding: 0.25rem 0.7rem; flex: none; }
 .topbar-info { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; }
+.topbar > #btn-back, .topbar > #btn-end { min-width: 44px; min-height: 44px; padding: 0; display: grid; place-items: center; }
+.topbar #btn-end .ico { width: 1.4rem; height: 1.4rem; }
+.topbar > #btn-back { font-size: 1.6rem; line-height: 1; }
 .dock { padding: 0.5rem 0.6rem; }
-.actions { justify-content: center; margin: 0.5rem 0 0; }
+.actions { display: grid; grid-template-columns: 1fr 1fr; justify-content: center; column-gap: 0.75rem; margin: 0.5rem 0 0; }
+/* Two fixed columns: the secondary buttons (Reset, Change amount) sit left, the primary one (Check, then Next or Play again)
+   always takes the same right-hand slot, so a player can tap the same spot to go on. */
+.actions button { grid-column: 1; justify-self: end; }
+.actions .primary { grid-column: 2; justify-self: start; min-width: 7rem; }
 
 /* Cashier: message, error, then a small label above one row with the field and Check on its right.
    #cashier-answer and .actions dissolve into the dock grid so Check can sit beside the field. */
 #cashier-answer { display: contents; }
 #screen-play.cashier .dock { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 0.5rem; align-items: center; }
 #screen-play.cashier .actions { display: contents; }
-/* solved: Check is hidden, so drop its column and let the locked field reach the dock's edge */
-#screen-play.cashier.locked .dock { grid-template-columns: minmax(0, 1fr); }
 #screen-play.cashier .dock > .message, #screen-play.cashier .error, #screen-play.cashier .cashier-answer label { grid-column: 1 / -1; }
-#screen-play.cashier .actions button { grid-column: 1 / -1; margin-top: 0.5rem; }
-#screen-play.cashier .actions #btn-check { grid-column: 2; margin-top: 0; }
+#screen-play.cashier .actions button { grid-column: 1 / -1; justify-self: stretch; margin-top: 0.5rem; }
+/* Check, then Next in its place once solved: both beside the field */
+#screen-play.cashier .actions .primary { grid-column: 2; justify-self: stretch; margin-top: 0; }
 .cashier-answer label { margin: 0 0 0.15rem; font-size: 0.85rem; color: var(--muted); }
 .cashier-answer input { min-width: 0; min-height: 44px; }
 .dock .error { min-height: 0; margin: 0; }
@@ -286,8 +295,10 @@ label { display: block; margin: 0.5rem 0 0.25rem; }
 .options input { width: 1.2rem; height: 1.2rem; flex: none; }
 .options .opt-text { display: inline-flex; align-items: center; gap: 0.4rem; flex: 1 1 0; min-width: 0; line-height: 1.2; }
 .options .badge { flex: none; }
-.options .radios { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; padding-inline: 0.4rem; }
+.options .radios { display: grid; grid-template-columns: repeat(var(--cols, 4), 1fr); gap: 0; padding-inline: 0.4rem; }
 .options .radios label { min-width: 0; padding-inline: 0; gap: 0.3rem; }
+.options .radios[data-dense="true"] label { flex-direction: column; justify-content: center; gap: 0.1rem; }
+.options .radios[data-dense="true"] + .why { margin-top: 0.5rem; }
 .ico { width: 1.15rem; height: 1.15rem; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .ico-fill { width: 14px; height: 14px; stroke: none; }
 .badge { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0 0.45rem; border: 1.5px solid currentColor; border-radius: 1rem; font-size: 0.8rem; line-height: 1.4; }
@@ -297,15 +308,26 @@ label { display: block; margin: 0.5rem 0 0.25rem; }
 .opt-head { display: flex; flex-wrap: nowrap; align-items: center; gap: 0.6rem; min-height: 44px; padding-inline: 0.4rem; text-align: left; }
 .why { display: block; margin: -0.3rem 0 0.3rem 2.2rem; color: var(--muted); font-size: 0.85rem; text-align: left; }
 h2.sec { width: 100%; max-width: 18.5rem; margin: 0.9rem auto 0.3rem; text-align: left; }
-.play { width: 100%; max-width: 18.5rem; margin: 0.5rem auto 1rem; }
+.play { display: block; width: 100%; max-width: 18.5rem; margin: 0 auto 0.25rem; }
 
-#screen-home, #screen-custom, #screen-options { flex: 1; min-height: 0; overflow-y: auto; }
-#screen-home { padding-top: 2.75rem; position: relative; display: grid; align-content: safe center; justify-items: center; text-align: center; }
+#screen-custom, #screen-options, #screen-leaderboard, #screen-summary { flex: 1; min-height: 0; overflow-y: auto; }
+#screen-home { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.home-bar { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.home-end { display: flex; align-items: center; gap: 0.25rem; }
+.home-body { flex: 1; min-height: 0; overflow-y: auto; display: grid; align-content: safe center; justify-items: center; text-align: center; }
+.home-foot { flex: none; padding-top: 0.5rem; border-top: 1px solid var(--line); }
+#screen-home h1 { margin: 0.25rem 0 0.25rem; overflow-wrap: anywhere; }
+.tagline { margin: 0 0 0.5rem; }
+.disclaimer { max-width: 18.5rem; margin: 0.75rem auto 0.5rem; color: var(--muted); font-size: 0.8rem; text-align: center; }
 
 .pile:empty::before { content: "Tap a coin to add it"; color: var(--muted); position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
 #screen-play.locked .coin, #screen-play.locked .pile-coin { opacity: 0.5; }
 
-.coin, .pile-coin { -webkit-touch-callout: none; user-select: none; }
+.coin, .pile-coin { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.coin *, .pile-coin * { -webkit-user-select: none; user-select: none; }
+.pile, .tray { -webkit-touch-callout: none; }
+#screen-play, #screen-play * { -webkit-user-select: none; user-select: none; }
+#screen-play input { -webkit-user-select: text; user-select: text; }
 
 .coin { touch-action: none; cursor: grab; }
 .coin.dragging-source { opacity: 0.5; }
@@ -331,9 +353,10 @@ h2.sec { width: 100%; max-width: 18.5rem; margin: 0.9rem auto 0.3rem; text-align
 .chips .ico { width: 1rem; height: 1rem; }
 .sub { margin: 0 0 0.4rem; color: var(--muted); font-size: 0.85rem; }
 #options-back { justify-self: start; }
-.options-btn { position: absolute; top: 0; left: 0; display: inline-flex; align-items: center; gap: 0.35rem; min-height: 44px; padding: 0 0.7rem; border-radius: 0.7rem; color: var(--ink); }
+.options-btn { display: grid; place-items: center; min-width: 44px; min-height: 44px; padding: 0; border-radius: 50%; color: var(--ink); }
+.options-btn .ico { width: 1.5rem; height: 1.5rem; }
 
-.theme-toggle { position: absolute; top: 0; right: 0; min-width: 44px; min-height: 44px; padding: 0; border-radius: 50%; display: grid; place-items: center; color: var(--ink); }
+.theme-toggle { min-width: 44px; min-height: 44px; padding: 0; border-radius: 50%; display: grid; place-items: center; color: var(--ink); }
 .theme-toggle svg { display: none; }
 .theme-toggle[data-state="auto"] .icon-auto, .theme-toggle[data-state="light"] .icon-light, .theme-toggle[data-state="dark"] .icon-dark { display: block; }
 
@@ -396,3 +419,17 @@ h2.sec { width: 100%; max-width: 18.5rem; margin: 0.9rem auto 0.3rem; text-align
   #screen-play.give-change .dock > .message:empty { min-height: 0; margin: 0; }
   #screen-play.give-change .actions { margin-top: 0.25rem; }
 }
+dialog { max-width: min(20rem, calc(100vw - 2rem)); padding: 1rem; border: 2px solid var(--line); border-radius: 0.8rem; background: var(--panel); color: var(--ink); }
+dialog::backdrop { background: #0006; }
+.dialog-actions { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.75rem; }
+#lb-mode, #lb-preset { grid-template-columns: repeat(3, 1fr); }
+#lb-table { width: 100%; max-width: 28rem; margin: 0.5rem auto; border-collapse: collapse; background: var(--panel); }
+#lb-table caption { padding: 0.4rem 0; font-weight: 700; }
+#lb-table th, #lb-table td { padding: 0.5rem 0.4rem; border-bottom: 1px solid var(--line); text-align: center; }
+#screen-summary { text-align: center; }
+.summary-score { margin: 0.25rem 0; font-size: 4rem; font-weight: 800; line-height: 1; }
+#screen-summary .row { justify-content: center; }
+#summary-rank { font-weight: 700; }
+#summary-leaderboard[hidden] { display: none; }
+#lb-table[hidden] { display: none; }
+#lb-table tr[aria-current="true"] { background: var(--accent-tint); font-weight: 700; }

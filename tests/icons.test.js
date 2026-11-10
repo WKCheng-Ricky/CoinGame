@@ -15,7 +15,7 @@ function withDom(fn) {
 }
 
 test("ICON_NAMES lists the option, button and badge icons", () => {
-  assert.deepEqual(ICON_NAMES, ["eye", "enlarge", "layers", "coin-down", "stopwatch", "hourglass", "gear", "easier", "harder", "neutral"]);
+  assert.deepEqual(ICON_NAMES, ["eye", "enlarge", "layers", "coin-down", "stopwatch", "hourglass", "gear", "flag", "trophy", "easier", "harder", "neutral"]);
 });
 
 test("every icon is a decorative 24-unit svg with content", withDom(() => {
@@ -41,4 +41,14 @@ test("badge is the effect word with its arrow icon", withDom(() => {
   assert.ok(b.classList.contains("badge") && b.classList.contains("badge-harder"));
   assert.equal(b.textContent.trim(), "Harder");
   assert.equal(b.querySelectorAll("svg[aria-hidden='true']").length, 1);
+}));
+
+test("the gear is a toothed cogwheel with a centre hole, not rays", withDom(() => {
+  const svg = icon("gear");
+  const d = svg.querySelector("path").getAttribute("d");
+  assert.match(d, /^M/);
+  assert.ok(d.endsWith("Z"), "the outline is closed");
+  assert.equal(d.match(/[ML]/g).length, 32, "8 teeth of 4 corners each");
+  assert.doesNotMatch(d, /M12 2v3/, "no longer the sun-like rays");
+  assert.equal(svg.querySelector("circle").getAttribute("r"), "3");
 }));
