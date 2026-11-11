@@ -1,4 +1,5 @@
-import { COINS } from "../src/coins.js";
+import { expect } from "@playwright/test";
+import { COINS } from "../src/constants/coins.js";
 
 // Short waits so tests do not sit through the real 2 s dwell, 1 s hold and 400 ms Next guard.
 export const FAST = "dwell=50&hold=50&advance=250";
@@ -30,10 +31,20 @@ export async function counterTotalPence(page) {
   return sum;
 }
 
-// Open Home with fast timings and start a mode by its Home button.
-// { difficulty: "easy" } selects Easy first (the running total is shown only in Easy).
+const MODE_VALUES = { Endless: "endless", Custom: "custom", Cashier: "cashier", "Give Change": "give-change" };
+
+// Open Home with fast timings, pick a mode, optionally a Difficulty preset, and press Play.
+// `name` is the mode's label ("Endless", "Custom", "Cashier", "Give Change"). { difficulty: "easy" } picks the
+// preset with that id ("easy", "normal", "hard", "veryHard"); Easy turns Show Coins on, which is what shows the
+// running total ("Your total: ...") on the play screen.
 export async function startMode(page, name, { difficulty } = {}) {
   await page.goto("/?" + FAST);
-  if (difficulty) await page.locator(`#diff-${difficulty}`).check();
-  await page.getByRole("button", { name, exact: true }).click();
+  // the radios are visually hidden, so click each one's label
+  await page.locator(`#modes label:has(input[value="${MODE_VALUES[name]}"])`).click();
+  await expect(page.locator(`#modes input[value="${MODE_VALUES[name]}"]`)).toBeChecked();
+  if (difficulty) {
+    await page.locator(`#presets label:has(input[value="${difficulty}"])`).click();
+    await expect(page.locator(`#presets input[value="${difficulty}"]`)).toBeChecked();
+  }
+  await page.locator("#btn-play").click();
 }

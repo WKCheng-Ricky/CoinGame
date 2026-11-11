@@ -1,5 +1,5 @@
 // Classic script run before the stylesheet so a saved theme is set before first paint.
-// Keep in step with THEME_KEY and the accepted values in src/theme.js.
+// Keep in step with THEME_KEY and the accepted values in src/services/theme.js.
 (() => {
   try {
     const THEME_KEY = "coin-game-theme";

@@ -76,6 +76,7 @@ Imports only point downward: `main` -> `controllers` / `views` -> `services` -> 
 ### Acceptance
 
 - `npm test` and `npm run test:coverage` pass, with the same 80% per-file gate.
+- The static server moves from `e2e/serve.js` to `scripts/serve.js`, since it is dev tooling behind `npm start` as well as the e2e tests. The deploy job copies an explicit file list, so `scripts/` is not published.
 - `npm start` serves a working game; a manual play of each mode shows no change.
 - No import goes upward in the dependency rule (checked by a small test that scans imports).
 

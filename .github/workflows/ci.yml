@@ -26,10 +26,7 @@ jobs:
       - run: npm ci
       - run: npm run test:coverage
 
-  # Paused while the features are still changing: re-enable (delete the `if` line and add `e2e` back to
-  # the `deploy` job's `needs`) when the comprehensive browser run is wanted again.
   e2e:
-    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -54,7 +51,7 @@ jobs:
       - name: Install system dependencies only (browser cached)
         if: steps.pw-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps chromium webkit
-      - run: npm run test:e2e:coverage
+      - run: npm run test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -62,10 +59,9 @@ jobs:
           path: |
             playwright-report/
             test-results/
-            coverage/e2e/
 
   deploy:
-    needs: [unit]
+    needs: [unit, e2e]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10

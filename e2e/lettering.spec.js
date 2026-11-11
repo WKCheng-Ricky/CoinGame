@@ -8,9 +8,9 @@ const MIN_GAP = 0.5;
 test("real letter ink clears the rim line and the body edge by 0.5 units on every arc coin", async ({ page }) => {
   await page.goto("/");
   const gaps = await page.evaluate(async () => {
-    const { COINS } = await import("/src/coins.js");
-    const { coinSvg } = await import("/src/render.js");
-    const { shapeRadiusAt } = await import("/src/shapes.js");
+    const { COINS } = await import("/src/constants/coins.js");
+    const { coinSvg } = await import("/src/views/coin-svg.js");
+    const { shapeRadiusAt } = await import("/src/utils/shapes.js");
     const PX = 10;
     // An SVG drawn as an image cannot see the page's @font-face, so the same files go inside it as data URIs.
     const dataUri = async (name) => {

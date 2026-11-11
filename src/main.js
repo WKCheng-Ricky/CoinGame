@@ -1,24 +1,26 @@
-import { describePile, detachNudge, formatPence, getCoinScale, parseAmount, randomTarget, setCoinScale, total, unitUids } from "./game.js";
-import { createDwell } from "./dwell.js";
-import { coinScaleFor, giveChangeOdds, timingFromSearch } from "./config.js";
-import { mountHome } from "./home.js";
-import { createDrag, createTrayDrag } from "./drag.js";
-import { isCheckShortcut } from "./keys.js";
-import { icon } from "./icons.js";
-import { timerOn } from "./options.js";
-import { clockText, formatClock, isExpired, timeLeftMs } from "./timer.js";
-import { applyTheme, getStorage, nextTheme, readTheme, saveTheme, themeLabel } from "./theme.js";
-import { announce, renderPile, renderTray, setText, showStackBadges } from "./render.js";
-import { boardId, createScoreStore } from "./scores.js";
-import { createChoiceDialog } from "./confirm.js";
-import { mountLeaderboard } from "./leaderboard.js";
-import { mountSummary } from "./summary.js";
+import { describePile, formatPence, parseAmount, randomTarget, total } from "./models/money.js";
+import { giveChangeOdds } from "./models/customer.js";
+import { coinScaleFor, detachNudge, getCoinScale, setCoinScale, unitUids } from "./models/pile.js";
+import { createDwell } from "./controllers/dwell.js";
+import { timingFromSearch } from "./services/url-params.js";
+import { mountHome } from "./views/home-view.js";
+import { createDrag, createTrayDrag } from "./controllers/drag.js";
+import { isCheckShortcut } from "./controllers/shortcuts.js";
+import { icon } from "./views/icons.js";
+import { timerOn } from "./constants/options.js";
+import { clockText, endSession, exitPrompt, formatClock, isExpired, timeLeftMs } from "./models/session.js";
+import { applyTheme, nextTheme, readTheme, saveTheme, themeLabel } from "./services/theme.js";
+import { getStorage } from "./services/storage.js";
+import { announce, renderPile, renderTray, setText, showStackBadges } from "./views/pile-view.js";
+import { boardId, createScoreStore } from "./services/scores.js";
+import { createChoiceDialog } from "./views/choice-dialog.js";
+import { mountLeaderboard } from "./views/leaderboard-view.js";
+import { mountSummary } from "./views/summary-view.js";
 import {
   addToPile, canAdvance, clearPile, createState, isContinuous, nextGiveChangeCustomer, nextCustomer, nextRound, startCashier, startGiveChange, submitAnswer,
   addToPileAt, moveCoin, moveGroup, removeFromPile, settleCoin, settleGroupCoins, setOption, selectMode,
-  applyPreset, pileHeightMm, startGame, submitCheck, submitGiveChangeAnswer, transferCoins, sendCoin, expireRound,
-  endSession, exitPrompt, pauseClock, resumeClock,
-} from "./state.js";
+  applyPreset, pileHeightMm, startGame, submitCheck, submitGiveChangeAnswer, transferCoins, sendCoin, expireRound, pauseClock, resumeClock,
+} from "./models/game-state.js";
 
 const $ = (id) => document.getElementById(id);
 const SCREENS = ["home", "custom", "options", "play", "summary", "leaderboard"];
@@ -217,7 +219,7 @@ function render() {
   const screen = $("screen-play");
   const showCoins = state.options.showCoins;
   screen.dataset.showCoins = String(showCoins);
-  // the tray drag ghost lives in <body> (drag.js), so mirror Show Coins there for the label rules
+  // the tray drag ghost lives in <body> (controllers/drag.js), so mirror Show Coins there for the label rules
   document.body.dataset.showCoins = String(showCoins);
   setText($("play-total"), fixedPile ? "" : `Your total: ${formatPence(total(state.pile))}`);
   // with Show Coins off a visible total would give away the hidden coin values
@@ -308,7 +310,7 @@ function moveAndRefocus(uid, x, y, key) {
   const focusedUid = focusedUidIn(key);
   update(moveCoin(state, uid, x, y, key));
   container.offsetWidth; // flush styles so the coin lands where released before it glides
-  el?.style.removeProperty("transition"); // set by the drop in drag.js
+  el?.style.removeProperty("transition"); // set by the drop in controllers/drag.js
   update(settleCoin(state, uid, from, key, compactQuery.matches));
   if (focusedUid !== null) container.querySelector(`[data-uid="${focusedUid}"]`)?.focus({ preventScroll: true });
 }
@@ -322,7 +324,7 @@ function moveGroupAndRefocus(uids, dx, dy, leaderUid, key) {
   const focusedUid = focusedUidIn(key);
   update(moveGroup(state, uids, dx, dy, key));
   container.offsetWidth; // flush styles so the group lands where released before it glides
-  for (const el of els) el?.style.removeProperty("transition"); // set by the drop in drag.js
+  for (const el of els) el?.style.removeProperty("transition"); // set by the drop in controllers/drag.js
   update(settleGroupCoins(state, uids, leaderUid, from, key, compactQuery.matches));
   // the group is re-ordered with replaceChildren, which drops focus, so restore it by uid
   if (focusedUid !== null) container.querySelector(`[data-uid="${focusedUid}"]`)?.focus({ preventScroll: true });
