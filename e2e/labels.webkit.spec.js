@@ -1,5 +1,4 @@
-// Runs in WebKit only (the "webkit" project in playwright.config.js). Plain @playwright/test, not ./fixtures.js,
-// because the coverage fixture needs Chromium's JS coverage API.
+// Runs in WebKit only (the "webkit" project in playwright.config.js).
 import { test, expect } from "@playwright/test";
 import { seedRandom, startMode } from "./helpers.js";
 
@@ -8,7 +7,7 @@ import { seedRandom, startMode } from "./helpers.js";
 // centre (or, for the 5p, on the vertical offset the coin gives it), turned with the coin.
 // Where each numeral in `pile` sits from where it should be on its (rotated) coin, with a tolerance.
 const numeralOffsets = (page, pile) => page.evaluate(async (sel) => {
-  const { COINS } = await import("/src/coins.js");
+  const { COINS } = await import("/src/constants/coins.js");
   return [...document.querySelectorAll(`${sel} .pile-coin`)].map((btn) => {
     const coin = COINS.find((c) => c.id === btn.dataset.coin);
     const svg = btn.querySelector("svg");

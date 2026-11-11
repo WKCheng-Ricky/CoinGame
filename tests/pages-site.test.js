@@ -42,15 +42,25 @@ test("no reference is root-absolute", () => {
   for (const ref of localReferences()) assert.ok(!ref.startsWith("/"), `${ref} must be relative`);
 });
 
-// The e2e job is paused (`if: false`), so deploy must not wait on it: a skipped dependency would skip the
-// deploy too. Re-enabling e2e means dropping its `if` and adding it back to deploy's `needs` (and here).
-test("e2e is paused and deploy waits only on unit", () => {
-  assert.equal(wf.jobs.e2e.if, false);
-  assert.deepEqual(wf.jobs.deploy.needs, ["unit"]);
+test("the e2e job runs unconditionally and deploy waits on unit and e2e", () => {
+  assert.ok(wf.jobs.e2e, "e2e job exists");
+  assert.ok(!("if" in wf.jobs.e2e), "e2e job has no `if`");
+  assert.deepEqual(wf.jobs.deploy.needs, ["unit", "e2e"]);
 });
 
-test("deploy runs only for pushes to main, after the unit job", () => {
-  assert.deepEqual(wf.jobs.deploy.needs, ["unit"]);
+test("the e2e job runs the happy-path suite without coverage on Chromium and WebKit", () => {
+  const steps = wf.jobs.e2e.steps;
+  assert.ok(steps.some((s) => s.run === "npm run test:e2e"));
+  assert.ok(!JSON.stringify(wf.jobs.e2e).includes("coverage"), "no coverage anywhere in the e2e job");
+  const installs = steps.filter((s) => s.run?.includes("playwright install")).map((s) => s.run);
+  assert.ok(installs.length > 0);
+  for (const browser of ["chromium", "webkit"]) {
+    assert.ok(installs.every((r) => r.includes(browser)), `install steps cover ${browser}`);
+  }
+});
+
+test("deploy runs only for pushes to main, after the unit and e2e jobs", () => {
+  assert.deepEqual(wf.jobs.deploy.needs, ["unit", "e2e"]);
   const cond = wf.jobs.deploy.if;
   assert.equal(typeof cond, "string");
   assert.ok(cond.includes("github.event_name == 'push'"));
